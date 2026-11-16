@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chibi Clash — TikTok LIVE Arena</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <canvas id="game" aria-label="Chibi Clash arena"></canvas>
+
+    <div id="hud">
+      <header class="topbar">
+        <div class="brand">
+          <h1>Chibi Clash</h1>
+          <p id="ticker">Like, comment, gift, or follow to join!</p>
+        </div>
+        <div class="timer-wrap">
+          <div class="timer-label" id="timer-label">Round 1</div>
+          <div class="timer" id="timer">5:00</div>
+        </div>
+        <div class="scores">
+          <div class="score rose">
+            <span class="label">Rose</span>
+            <strong id="score-rose">0</strong>
+            <em id="count-rose">0</em> in
+          </div>
+          <div class="vs">VS</div>
+          <div class="score sky">
+            <span class="label">Sky</span>
+            <strong id="score-sky">0</strong>
+            <em id="count-sky">0</em> in
+          </div>
+        </div>
+      </header>
+
+      <div class="sidecards">
+      <aside class="leaderboard" id="leaderboard">
+        <div class="lb-col">
+          <h3>Top HP</h3>
+          <ol id="lb-hp"></ol>
+        </div>
+        <div class="lb-col">
+          <h3>Top KOs</h3>
+          <ol id="lb-kos"></ol>
+        </div>
+      </aside>
+
+      <aside class="queue-panel" id="queue-panel">
+        <h3>Reserved seats <span id="queue-count">0/80</span></h3>
+        <ol id="queue-names"></ol>
+        <p class="seats-full" id="seats-full" hidden>Seats are full — thanks for watching! Please try again next round.</p>
+      </aside>
+      </div>
+
+      <div class="howto">
+        Like, comment, gift, or follow to join · type <b>girl</b> or <b>boy</b> for your look ·
+        1 coin = +30 HP · gifts unlock a shiny <b>sword</b>
+      </div>
+      <div class="hotkey-hint">Press <b>T</b> for the test panel · <b>M</b> to mute</div>
+    </div>
+
+    <div id="winner" class="winner" hidden>
+      <div class="winner-card">
+        <p class="winner-kicker" id="winner-kicker">Round 1</p>
+        <h2 id="winner-title">Rose wins!</h2>
+        <p class="winner-reason" id="winner-reason">most survivors</p>
+        <p class="winner-mvp" id="winner-mvp"></p>
+        <p class="winner-next" id="winner-next">Next round in 8…</p>
+      </div>
+    </div>
+
+    <aside id="panel" class="panel" hidden>
+      <h2>Test / simulator</h2>
+      <p class="ws-row">
+        <span id="ws-status" data-state="idle">Connecting to TikFinity…</span>
+      </p>
+
+      <label class="row">
+        <span>Volume</span>
+        <input id="volume" type="range" min="0" max="100" value="70" />
+      </label>
+      <label class="row check">
+        <input id="mute" type="checkbox" />
+        <span>Mute sounds (M)</span>
+      </label>
+
+      <div class="btn-row">
+        <button id="btn-sim-like" type="button">Fake like</button>
+        <button id="btn-sim-follow" type="button">Fake follow</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-sim-girl" type="button">Comment “girl”</button>
+        <button id="btn-sim-boy" type="button">Comment “boy”</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-sim-gift1" type="button">Gift 1 coin</button>
+        <button id="btn-sim-gift10" type="button">Gift 10</button>
+        <button id="btn-sim-gift100" type="button">Gift 100</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-add-110" type="button">Add 110 viewers</button>
+        <button id="btn-end-round" type="button">End round now</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-clear" type="button" class="ghost">Clear arena</button>
+      </div>
+
+      <p class="hint">
+        Toggle this panel with <b>T</b>. On stream, keep it closed (or use
+        <code>?overlay=1</code>). Volume and mute are remembered.
+        The game only listens to TikFinity — it never sends likes, comments, or gifts to TikTok.
+      </p>
+      <ul id="event-log" class="log"></ul>
+    </aside>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

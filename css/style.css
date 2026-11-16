@@ -1,0 +1,426 @@
+:root {
+  --rose: #ff5b8a;
+  --rose-dark: #a51d4a;
+  --sky: #3db8ff;
+  --sky-dark: #155a96;
+  --ink: #2a1c18;
+  --panel: rgba(28, 16, 24, 0.82);
+  --text: #fff7f0;
+  /* TikTok comment overlay occupies about the bottom 25% and the right edge. */
+  --tiktok-bottom: 25%;
+  --tiktok-right: 78px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1014;
+  color: var(--text);
+  font-family: Nunito, "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---- Top bar: title, timer, scores (stays in the sky, above the floor) ---- */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px var(--tiktok-right) 0 16px;
+  gap: 10px;
+}
+
+.brand {
+  max-width: 42%;
+  min-width: 0;
+}
+
+.brand h1 {
+  font-family: Fredoka, Nunito, sans-serif;
+  font-size: 34px;
+  margin: 0;
+  letter-spacing: 0.02em;
+  text-shadow: 0 3px 0 #a51d4a, 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.brand p {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.25;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.timer-wrap {
+  text-align: center;
+  background: var(--panel);
+  border-radius: 18px;
+  padding: 6px 18px 5px;
+  min-width: 120px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+.timer-label {
+  font-family: Fredoka, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.timer {
+  font-family: Fredoka, Nunito, sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.timer.warn { color: #ffe08a; }
+.timer.urgent { color: #ff8aa0; }
+
+.scores {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+.score { text-align: center; min-width: 64px; }
+
+.score .label {
+  display: block;
+  font-family: Fredoka, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.score strong { display: block; font-size: 26px; line-height: 1; }
+.score em { font-style: normal; font-weight: 800; font-size: 12px; }
+.score.rose .label, .score.rose strong { color: var(--rose); }
+.score.sky .label, .score.sky strong { color: var(--sky); }
+.vs { font-family: Fredoka, sans-serif; font-weight: 700; opacity: 0.7; }
+
+/* Compact left-side cards — do not cover the midfield or the right edge. */
+.sidecards {
+  position: fixed;
+  left: 10px;
+  top: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 168px;
+  z-index: 2;
+}
+
+.leaderboard, .queue-panel {
+  position: static;
+  width: auto;
+  min-width: 0;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 6px 8px 7px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+.queue-panel {
+  position: fixed;
+  left: 10px;
+  top: 58px;
+  width: 158px;
+  padding: 5px 8px 6px;
+  z-index: 3;
+}
+
+.leaderboard { display: flex; gap: 8px; }
+.lb-col { min-width: 0; flex: 1; }
+
+.lb-col h3, .queue-panel h3 {
+  margin: 0 0 4px;
+  font-family: Fredoka, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ffe08a;
+}
+
+.leaderboard ol, .queue-panel ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.leaderboard li, .queue-panel li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 1px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard .nm, .queue-panel .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 118px;
+}
+.queue-panel ol { font-size: 10px; }
+.queue-panel h3 { font-size: 10px; margin: 0 0 2px; }
+
+.leaderboard .stat { color: #bbf7d0; }
+.leaderboard .ko { color: #fecdd3; }
+.queue-panel h3 span { color: #fff; }
+
+.seats-full {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #ffe08a;
+}
+
+/* Join hint sits just above TikTok's comment overlay (~bottom 25%). */
+.howto {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--tiktok-bottom) + 10px);
+  transform: translateX(-50%);
+  background: var(--panel);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.3;
+  width: min(620px, 70%);
+  white-space: normal;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.howto b { color: #ffe08a; }
+
+.hotkey-hint {
+  position: absolute;
+  left: 14px;
+  bottom: calc(var(--tiktok-bottom) + 58px);
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.4;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.hotkey-hint b { color: #ffe08a; }
+
+/* Winner card is centered in the fight area, not in the comment zone. */
+.winner {
+  position: absolute;
+  left: 0;
+  right: var(--tiktok-right);
+  top: 0;
+  height: 75%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to bottom, rgba(16, 8, 14, 0.28), rgba(16, 8, 14, 0.08) 80%, transparent);
+  pointer-events: none;
+}
+
+.winner[hidden] { display: none !important; }
+
+.winner-card {
+  text-align: center;
+  background: rgba(28, 16, 24, 0.94);
+  border-radius: 22px;
+  padding: 22px 28px 20px;
+  width: min(520px, 86%);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  border: 3px solid rgba(255, 224, 138, 0.5);
+}
+
+.winner-kicker {
+  margin: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffe08a;
+}
+
+.winner-card h2 {
+  font-family: Fredoka, sans-serif;
+  font-size: 48px;
+  margin: 6px 0 8px;
+  line-height: 1;
+}
+
+.winner-card.rose h2 { color: var(--rose); }
+.winner-card.sky h2 { color: var(--sky); }
+.winner-card.draw h2 { color: #ffe08a; }
+.winner-reason, .winner-mvp, .winner-next { margin: 4px 0; font-weight: 800; font-size: 14px; }
+.winner-next { opacity: 0.85; margin-top: 10px; }
+
+/* Test panel: left side, above the comment zone. Hidden until T. */
+.panel {
+  display: none;
+  position: absolute;
+  left: 12px;
+  right: auto;
+  top: 210px;
+  width: 260px;
+  max-height: 48%;
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  z-index: 5;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  overflow: auto;
+}
+
+body.show-test .panel { display: block; }
+body.overlay .panel { display: none; }
+body.overlay.show-test .panel { display: block; }
+body.overlay .hotkey-hint { opacity: 0.28; }
+
+.panel h2 {
+  font-family: Fredoka, sans-serif;
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+.ws-row { margin: 0 0 10px; font-size: 13px; font-weight: 700; }
+#ws-status[data-state="connected"] { color: #86efac; }
+#ws-status[data-state="connecting"],
+#ws-status[data-state="reconnecting"] { color: #fde68a; }
+#ws-status[data-state="error"],
+#ws-status[data-state="idle"] { color: #fca5a5; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.row input[type="range"] { width: 140px; }
+.row.check { justify-content: flex-start; }
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+button {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 12px;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  color: #fff;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+button:hover { filter: brightness(1.06); }
+
+.hint {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.8;
+  margin: 10px 0 6px;
+}
+
+.hint code {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.log {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 11px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.log li {
+  padding: 3px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ---- 16:9 optional layout (?landscape=1) ---- */
+body.landscape {
+  --tiktok-bottom: 6%;
+  --tiktok-right: 20px;
+}
+
+body.landscape .brand { max-width: none; }
+body.landscape .brand h1 { font-size: 42px; }
+body.landscape .brand p { font-size: 16px; }
+body.landscape .timer { font-size: 40px; }
+body.landscape .score { min-width: 88px; }
+body.landscape .score strong { font-size: 32px; }
+body.landscape .sidecards {
+  top: 118px;
+  width: 240px;
+  flex-direction: column;
+}
+body.landscape .howto {
+  width: auto;
+  max-width: 90%;
+  white-space: nowrap;
+  font-size: 15px;
+  padding: 10px 18px;
+}
+body.landscape .hotkey-hint { left: auto; right: 20px; bottom: 16px; }
+body.landscape .winner { right: 0; height: 100%; }
+body.landscape .winner-card h2 { font-size: 64px; }
+body.landscape .panel { left: auto; right: 18px; top: 110px; max-height: calc(100vh - 130px); }
+
+body.results-on .howto,
+body.results-on .hotkey-hint,
+body.results-on .hint {
+  display: none !important;
+}
