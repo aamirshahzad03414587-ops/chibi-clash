@@ -74,8 +74,9 @@ function layoutView() {
   // a 2160x3840 buffer was what made five fighters stutter and what softened every name.
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const ins = safeInsets();
-  const vw = Math.max(1, window.innerWidth - ins.l - ins.r);
-  const vh = Math.max(1, window.innerHeight - ins.t - ins.b);
+  const vv = window.visualViewport;
+  const vw = Math.max(1, (vv ? vv.width : window.innerWidth) - ins.l - ins.r);
+  const vh = Math.max(1, (vv ? vv.height : window.innerHeight) - ins.t - ins.b);
   const aspect = W / H;
   let cssW, cssH;
   if (vw / vh > aspect) { cssH = vh; cssW = vh * aspect; }
@@ -101,6 +102,20 @@ function layoutView() {
   if (cv.height !== bh) cv.height = bh;
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low';
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const wrap = document.getElementById('wrap');
+  if (wrap) {
+    if (vv) {
+      wrap.style.top = (vv.offsetTop || 0) + 'px';
+      wrap.style.left = (vv.offsetLeft || 0) + 'px';
+      wrap.style.width = vv.width + 'px';
+      wrap.style.height = vv.height + 'px';
+      wrap.style.right = 'auto';
+      wrap.style.bottom = 'auto';
+    } else {
+      wrap.style.top = '0'; wrap.style.left = '0'; wrap.style.right = '0'; wrap.style.bottom = '0';
+      wrap.style.width = ''; wrap.style.height = '';
+    }
+  }
   ensureRasters();
 }
 // fill the bands above/below (or beside) the 9:16 game so the whole phone screen is used
@@ -4579,7 +4594,7 @@ function updateLiveInfo() {
   const el = document.getElementById('liveInfo'); if (!el) return;
   const m = S.live.mode;
   const who = S.live.username ? '@' + S.live.username : 'them';
-  el.textContent = m === 'live' ? 'Connected to LIVE' : m === 'simulator' ? 'TEST MODE: add ?user=yourname to the link' : m === 'offline' ? 'Waiting for ' + who + ' to go LIVE...' : m === 'error' ? (S.live.message || 'TikTok blocked the lookup - retrying') : 'Connecting...';
+  el.textContent = m === 'live' ? (S.live.username ? 'Connected to @' + S.live.username : 'Connected to LIVE') : m === 'simulator' ? 'TEST MODE: add ?tiktok=yourname to the link for phone lives' : m === 'offline' ? 'Waiting for ' + who + ' to go LIVE...' : m === 'error' ? (S.live.message || 'TikTok blocked the lookup - retrying') : (S.live.message || 'Connecting...');
 }
 
 // ============================================================ TAP TO START (sound + full screen on phones)

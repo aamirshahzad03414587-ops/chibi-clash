@@ -1,9 +1,16 @@
 /* CHIBI CLASH live events: TikFinity Desktop on the SAME PC re-broadcasts your TikTok LIVE events at
    ws://127.0.0.1:21213/ . This page only LISTENS to that local socket. Nothing here logs into TikTok,
-   scrapes TikTok, sends likes/comments, or talks to any server. Auto-reconnects with backoff.
-   Override the address with ?tikfinity=ws://host:port/ . Classic script, loaded before game.js. */
+   scrapes TikTok, or sends likes/comments. Auto-reconnects with backoff.
+   Override the address with ?tikfinity=ws://host:port/ .
+   Phone mode: ?tiktok=<username> connects to the fortune-live bridge instead
+   (default wss://fortune-live.onrender.com/tt, or ?bridge=wss://host/tt) so likes,
+   comments and gifts work when you stream from a phone, where TikFinity can't run.
+   Classic script, loaded before game.js. */
 'use strict';
-const TF = { url: 'ws://127.0.0.1:21213/', ws: null, wait: 1000, timer: 0, seen: new Map(), state: 'idle', lastMsg: 0, count: 0 };
+const TF = { url: 'ws://127.0.0.1:21213/', ws: null, wait: 1000, timer: 0, seen: new Map(), state: 'idle', lastMsg: 0, count: 0, username: '', phone: false };
+function tfQuery() {
+  try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); }
+}
 function tfUser(d) {
   const u = d.user || d.sender || {};
   const uid = String(d.uniqueId || d.unique_id || u.uniqueId || u.unique_id || u.displayId || u.userId || d.userId || '').trim();
@@ -46,29 +53,67 @@ function tfDuplicate(name, d, ev) {
   if (TF.seen.size > 600) for (const [k, t] of TF.seen) if (now - t > 60000) TF.seen.delete(k);
   return false;
 }
-function tfStatus(mode, message) {
-  try { if (typeof onEvent === 'function') onEvent({ type: 'status', mode, message: message || '', username: '' }); } catch (e) {}
+function tfPaintStatus(mode, message) {
+  try {
+    const qs = tfQuery();
+    const el = document.getElementById('ttStatus');
+    if (!el) return;
+    const hide = qs.has('overlay') || qs.has('clean') || !TF.phone;
+    el.classList.toggle('hidden', hide);
+    if (hide) return;
+    const who = TF.username ? '@' + TF.username : '';
+    el.textContent = message || (mode === 'live' ? 'Live ' + who : mode === 'offline' ? 'Waiting for ' + who + ' to go live' : mode === 'error' ? (message || 'Could not connect') : 'Connecting…');
+  } catch (e) {}
+}
+function tfStatus(mode, message, username) {
+  if (username) TF.username = username;
+  try { if (typeof onEvent === 'function') onEvent({ type: 'status', mode, message: message || '', username: username || TF.username || '' }); } catch (e) {}
+  tfPaintStatus(mode, message);
 }
 function connectTikFinity() {
-  try { const q = new URLSearchParams(location.search).get('tikfinity'); if (q && /^wss?:\/\//.test(q)) TF.url = q; } catch (e) {}
+  const qs = tfQuery();
+  const user = String(qs.get('tiktok') || '').trim().replace(/^@/, '');
+  if (user) {
+    const custom = qs.get('bridge');
+    const base = (custom && /^wss?:\/\//.test(custom)) ? custom : 'wss://fortune-live.onrender.com/tt';
+    TF.url = base + (base.includes('?') ? '&' : '?') + 'u=' + encodeURIComponent(user);
+    TF.username = user;
+    TF.phone = true;
+  } else {
+    try { const q = qs.get('tikfinity'); if (q && /^wss?:\/\//.test(q)) TF.url = q; } catch (e) {}
+  }
   if (TF.ws) return;
   let ws;
   TF.state = 'connecting';
   try { ws = new WebSocket(TF.url); } catch (e) { tfRetry(); return; }
   TF.ws = ws;
-  ws.onopen = () => { TF.state = 'live'; TF.wait = 1000; tfStatus('live', 'TikFinity connected'); };
+  ws.onopen = () => {
+    TF.wait = 1000;
+    if (TF.phone) tfStatus('connecting', 'Connecting to @' + TF.username + '…', TF.username);
+    else { TF.state = 'live'; tfStatus('live', 'TikFinity connected'); }
+  };
   ws.onmessage = (m) => {
     let msg; try { msg = JSON.parse(m.data); } catch (e) { return; }
     if (!msg) return;
     const name = String(msg.event || msg.type || msg.eventName || '');
     const data = msg.data || msg.payload || msg;
+    if (name === 'status') {
+      const mode = String((data && (data.state || data.mode)) || '');
+      if (mode) { TF.state = mode; tfStatus(mode, (data && data.message) || '', (data && data.username) || TF.username); }
+      return;
+    }
     const ev = tfNormalize(name, data);
     if (!ev || (ev.type !== 'viewers' && tfDuplicate(name, data, ev))) return;
     TF.lastMsg = performance.now(); TF.count++;
     try { onEvent(ev); } catch (e) { console.warn('event', e); }
   };
   ws.onerror = () => {};
-  ws.onclose = () => { if (TF.ws === ws) TF.ws = null; tfStatus('connecting', 'Waiting for TikFinity on ' + TF.url); tfRetry(); };
+  ws.onclose = () => {
+    if (TF.ws === ws) TF.ws = null;
+    if (TF.phone) tfStatus('connecting', 'Reconnecting to @' + (TF.username || 'LIVE') + '…', TF.username);
+    else tfStatus('connecting', 'Waiting for TikFinity on ' + TF.url);
+    tfRetry();
+  };
 }
 function tfRetry() {
   clearTimeout(TF.timer);

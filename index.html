@@ -29,7 +29,7 @@
 <style>
   @font-face { font-family: 'Bangers'; src: url('fonts/Bangers-Regular.ttf'); }
   @font-face { font-family: 'Russo'; src: url('fonts/RussoOne-Regular.ttf'); }
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: 'Russo', Arial, sans-serif;
+  html, body { margin: 0; width: 100%; height: 100%; height: 100dvh; background: #000; overflow: hidden; font-family: 'Russo', Arial, sans-serif;
                touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   #wrap { position: fixed; left: 0; top: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: #000; }
   /* game.js sets the canvas to a real 9:16 box. The page stays black around it. Never stretch. */
@@ -73,6 +73,16 @@
   #sim .b0 { background: #111; border-color: #888; } #sim .b1 { background: #eee; color: #000; } #sim .b2 { background: #b11; border-color: #f55; }
   #sim small { color: #8ea3d6; display: block; margin-top: 4px; line-height: 1.4; }
   #sim select { width: 100%; margin-bottom: 4px; background: #0c1430; color: #fff; border: 1px solid #2f5bd8; border-radius: 6px; padding: 3px; }
+  /* phone-mode status: test mode only (hidden when ?overlay=1) */
+  #ttStatus { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%);
+              z-index: 8; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+              background: rgba(0,0,0,.62); color: #dfe8ff; border: 1px solid rgba(255,255,255,.2); border-radius: 999px;
+              padding: 4px 12px; font: 11px 'Russo', Arial, sans-serif; pointer-events: none; }
+  #ttStatus.hidden { display: none; }
+  @media (max-width: 700px) {
+    #sim { left: 8px; right: 8px; top: auto; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto;
+           max-height: 42vh; }
+  }
 </style>
 </head>
 <body>
@@ -93,9 +103,10 @@
   <div class="row"><button id="bossBtn">Boss now (B)</button><button id="soundBtn">Sound (M)</button></div>
   <small>A like or comment joins at 50 HP (once). Gifts add 30 HP per coin and give a sword (10+ coins royal, 100+ legend). Follows say thanks only.<br>
   30 fight at once, 80 reserved seats. Keys: L C Y U K V Q E R T A N B M H, X = KO someone.<br>
-  On stream use <b>?overlay=1</b> (hides this panel). Events: TikFinity at ws://127.0.0.1:21213/<br>
+  On stream use <b>?overlay=1</b> (hides this panel). PC: TikFinity at ws://127.0.0.1:21213/. Phone: <b>?overlay=1&amp;tiktok=USERNAME</b><br>
   <span id="liveInfo">-</span></small>
 </div>
+<div id="ttStatus" class="hidden"></div>
 <audio id="ref-audio" autoplay playsinline preload="auto" style="position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></audio>
 <script src="gender.js"></script>
 <script src="chibi.js"></script>
