@@ -86,7 +86,7 @@ function layoutView() {
   let bw, bh, displayW, displayH;
   if (fit >= 0.999) {
     bw = W; bh = H;                       // integer 1:1 world pixels. Higher scales blow the frame budget.
-    displayW = bw / dpr; displayH = bh / dpr;
+    displayW = cssW; displayH = cssH;     // fill the fitted box (phones at 3x were shown at 360px wide with side gaps)
     VIEW.k = 1;
   } else {
     bh = Math.max(2, Math.round(devH));
