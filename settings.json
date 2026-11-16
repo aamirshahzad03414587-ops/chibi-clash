@@ -1,0 +1,21 @@
+{
+ "game": {
+  "title": "CHIBI CLASH",
+  "roundSeconds": 300,
+  "finalRushSeconds": 30,
+  "likeHp": 50,
+  "giftMultiplier": 30,
+  "maxFighters": 30,
+  "bossEvery": 90,
+  "bossSeconds": 25,
+  "fighterSize": 1.1,
+  "damage": 1,
+  "suddenDeathDamage": 1.5,
+  "slowMotion": true,
+  "sound": true,
+  "volume": 0.8,
+  "refereeVoice": false,
+  "timeUpRanking": "hp"
+ },
+ "_help": "1 coin = +30 HP (giftMultiplier). A like or a comment joins once at likeHp. Follows give nothing. 30 fight at once, 80 reserved seats (fixed). FINAL RUSH = last finalRushSeconds, hits x suddenDeathDamage. Boss every bossEvery seconds for bossSeconds. timeUpRanking: 'hp' = most HP wins at 0:00 (shown rule); 'effective' = HP divided by the gift damage multiplier (fairer to free players). Gift fairness: damage taken x maxHp/effHp, effHp = 120*(1+0.6*log2(maxHp/120)) above 120 HP. ?split=0 keeps one arena."
+}
