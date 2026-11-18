@@ -1,6 +1,6 @@
 /* NEON BRAWL - night-city brawl for TikTok LIVE (1080x1920). Same fight engine as Chibi Clash,
    restyled as a distinct game: neon city arena, Rose vs Teal teams, visor fighters, shrinking grid.
-   autobot-v2: always keep 2 fighters (AI fillers); real viewers use TikTok DP as the chibi face. */
+   autobot-v3: always 2 fighters, viewer DP faces, neon winner dance, mid-round rejoin (comment/like/gift). */
 'use strict';
 
 // ============================================================ setup
@@ -674,6 +674,10 @@ const POSES = {
   taunt1:  P(0.05, 1.5, 2.9, 0.4, 2.8, 0.42, 0.18, -0.3, -0.48),       // "come on" beckon
   taunt2:  P(0.05, 1.5, 1.9, 0.4, 2.8, 0.42, 0.18, -0.3, -0.48),
   cheer:   P(0, 2.7, 3.0, 2.5, 2.9, 0.25, 0.05, -0.25, -0.35),
+  danceUp:   P(-0.18, 2.85, 3.2, 2.6, 3.05, 0.62, 0.08, -0.12, -0.55),
+  dabA:      P(0.42, 1.85, 2.35, -0.55, 0.15, 0.7, 0.15, -0.55, -0.85),  // dab lean
+  dabB:      P(0.22, 2.1, 2.6, -0.2, 0.45, 0.4, 0.08, -0.3, -0.5),
+  danceSpin: P(-0.1, 1.6, 2.9, 1.6, 2.9, 0.45, 0.1, -0.45, -0.6),
   chinA:   P(-0.04, 0.35, 0.6, 1.15, 3.0, 0.3, 0.08, -0.25, -0.35),      // thumb wipes the chin
   chinB:   P(-0.08, 0.35, 0.6, 1.3, 3.45, 0.3, 0.08, -0.25, -0.35),
   neckA:   P(0.02, 2.25, 3.9, 2.05, 3.7, 0.32, 0.1, -0.28, -0.38),       // hands on the head, neck crack
@@ -777,7 +781,11 @@ const MV = {
   iaiReady: { dur: 0.55, fr: [[0, '*'], [0.25, 'swIaiW', 'in'], [0.55, 'swIaiW']], snd: [[0.1, 'iai']] },
   iaiCut: { dur: 0.9, pass: true, fr: [[0, '*'], [0.05, 'swIaiA', 'out'], [0.9, 'swIaiA']], snd: [[0, 'swing'], [0.02, 'kiai']] },
   sheath: { dur: 0.7, fr: [[0, '*'], [0.3, 'swSheath'], [0.55, 'swSheath'], [0.7, 'base']], snd: [[0.5, 'clang', 0.5]] },
-  victory: { dur: 99, fr: [[0, '*'], [0.3, 'cheer']] },
+  victory: { dur: 1.25, next: 'victory',
+    fr: [[0, 'cheer'], [0.16, 'danceSpin', 'out'], [0.4, 'dabA', 'out'], [0.62, 'dabB'], [0.88, 'danceSpin'], [1.25, 'cheer']],
+    rot: [[0, 0], [0.18, 0], [0.55, TAU], [0.88, TAU], [1.25, TAU * 2]],
+    imp: [[0.18, 0, -680]],
+    snd: [[0.18, 'jump', 0.5], [0.4, 'kiai', 0.45]] },
   // ---------- sword ----------
   swKesa: { dur: 0.6, cancel: 0.36, fr: [[0, '*'], [0.15, 'swJodan', 'in'], [0.23, 'swKesa', 'out'], [0.36, 'swKesa'], [0.6, 'base']], imp: [[0.14, 420]], snd: [[0.16, 'swing'], [0.14, 'kiai', 0.8]],
     hits: [{ t: 0.22, reach: 130, dmg: 11, type: 'heavy', h: 'high', limb: 'sw', kx: 520, ky: -200, sword: true }] },
@@ -921,6 +929,7 @@ class Fighter {
     if (Math.abs(T.s - T.ts) > 0.005) T.s = lerp(T.s, T.ts, Math.min(1, dt * 4));
     if (T.giantT > 0) { T.giantT -= dt; if (T.giantT <= 0) { T.ts = BASE_S; floatText(T.x, T.y - 200 * T.s, 'GIANT MODE OVER', '#aab', 22); } }
     if (round.state === 'end' && round.winnerF === T && T.onGround && (!T.mv || T.mv.name !== 'victory') && !T.busy()) T.play('victory', { keepFace: true });
+    if (T.mv && T.mv.name === 'victory') celeSpark(T, dt);
     if (T.isGun()) { const e = T.foe; if (e) T.aim = clamp(Math.atan2(-(e.cy() - T.cy()), Math.abs(e.x - T.x) + 1), -0.7, 0.7); }
     if (T.mv) T.updateMove(dt);
     const M = T.mv, d = M ? M.d : null;
@@ -1005,7 +1014,8 @@ class Fighter {
       if (T.giant) shake(14);
     }
     // Mid-fight joiners cannot be hit in the air. The instant they stand on the ground, they can.
-    if (T.invulnUntilLand) { T.invulnUntilLand = false; T.invuln = 1.0; }
+    if (T.invulnUntilLand) { T.invulnUntilLand = false; T.invuln = REJOIN_INVULN; }
+    if (T.spawnFx) { T.spawnFx = false; spawnBurst(T); }
     if (T.mv && T.mv.d.hurt && T.mv.d.untilLand && vy > 300) { shake(12); dustCloud(T.x, T.y, 9, 1); dirt(T.x, T.y, 0, 10); sfx('thud', T.x, 0.8); }
   }
   tryHit(h) {
@@ -1053,7 +1063,7 @@ class Fighter {
       p[9] = sw(pa) + (sw(pb) - sw(pa)) * u;
       if (M.d.gun) { p[1] = PI / 2 + T.aim; p[2] = PI / 2 + T.aim; if (T.weapon === 'rifle') { p[3] = PI / 2 + T.aim - 0.45; p[4] = PI / 2 + T.aim; } p[9] = p[2]; }
       if (M.d.tremble) { const w = Math.sin(clock * 70 + T.id) * 0.05; p[0] += w; p[1] += w; p[3] -= w; }
-      if (M.name === 'victory') { const w = Math.sin(clock * 8 + T.id); p[1] += w * 0.2; p[3] -= w * 0.2; }
+      if (M.name === 'victory') { const w = Math.sin(clock * 14 + T.id); p[1] += w * 0.22; p[3] += Math.cos(clock * 12) * 0.2; p[0] += Math.sin(clock * 9) * 0.08; }
       return p;
     }
     const base = basePose(T);
@@ -1225,7 +1235,11 @@ function wallBounce(T, side, vx) {
 // the KO: impact frame, freeze, long slow motion, orbiting camera, ragdoll flies
 function finisher(A, D, h, dir) {
   D.hp = 0; D.alive = false; D.mv = null;
-  if (D.user) { D.user.eliminated = true; D.user.queued = false; waitQ = waitQ.filter((q) => q !== D.user); }
+  if (D.user) {
+    D.user.eliminated = true; D.user.queued = false;
+    D.user.rejoinReady = clock + REJOIN_COOLDOWN; D.user.bonusHp = 0;
+    waitQ = waitQ.filter((q) => q !== D.user);
+  }
   tryDropQueued();
   const others = fighters.filter((f) => f.alive && !f.boss).length;
   const finalBlow = others <= 1 && !waitQ.length;
@@ -2125,6 +2139,10 @@ function pitMax() {
 }
 // Extra seats behind the pit. These people are not drawn. First in, first out.
 const WAIT_MAX = 80;
+const REJOIN_COOLDOWN = 3;   // seconds after a KO before that viewer can drop back in
+const REJOIN_INVULN = 1;     // seconds of spawn protection after landing
+const LAST_STAND_HOLD = 6;   // wait with 1 fighter left so others can rejoin; the round timer is the hard cap
+const RESULTS_LEAD = 0.85;   // compact results card fades in after a short winner-dance beat
 const round = { n: 0, state: 'lobby', t: 0, time: 0, winner: -1, winnerF: null, mvp: null, sudden: false, sdT: 0, beeps: 0, mur: -1, bowed: false, startedWith: 0, bantered: false };
 const heroes = [null, null];
 const G_ = () => S.game;
@@ -2154,7 +2172,7 @@ function makePlayer(ev, baseHp) {
     nick: String(ev.nick || ev.id || 'viewer').replace(/\s+/g, ' ').trim().slice(0, 18) || 'viewer',
     color: pickColor(),
     baseHp, bonusHp: 0, coins: 0, wins: 0,
-    fighter: null, queued: false, eliminated: false, avatarUrl: '', avatarRec: null,
+    fighter: null, queued: false, eliminated: false, rejoinReady: 0, cdSaid: 0, avatarUrl: '', avatarRec: null,
     gender: '', look: null, lastSeen: clock, kos: 0, taken: 0, dealt: 0, lowest: 1, joinedAt: clock,
     isBot: !!(ev && ev.isBot)
   }, ev);
@@ -2211,8 +2229,33 @@ function spawnDrop(p, announce) {
   }
   return spawnBody(p, gapX(), announce, 2.8);
 }
+function spawnBurst(f) {
+  const col = (TEAMS[f.team] && TEAMS[f.team].accent) || '#00f0ff';
+  ring(f.x, f.y, 110 * f.s, col, 0.5, 7);
+  ring(f.x, f.y - 180 * f.s, 46 * f.s, '#ff2bd6', 0.35, 4);
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * TAU, sp = rand(180, 520);
+    addPart({ k: 'spark', x: f.x, y: f.y - rand(20, 240) * f.s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 200, life: rand(0.35, 0.7), max: 0.7, size: rand(3, 6), color: pick([col, '#00f0ff', '#ffffff', '#ff2bd6']), g: 0.04, ar: f.ar | 0 });
+  }
+  addPart({ k: 'flash', x: f.x, y: f.y - 140 * f.s, life: 0.28, max: 0.28, size: 90 * f.s, color: '#7af8ff', ar: f.ar | 0 });
+}
+function celeSpark(T, dt) {
+  if (Math.random() < dt * 24) {
+    addPart({ k: 'spark', x: T.x + rand(-55, 55) * T.s, y: T.y - rand(40, 230) * T.s, vx: rand(-90, 90), vy: rand(-320, -40), life: rand(0.35, 0.7), max: 0.7, size: rand(3, 6), color: pick(['#00f0ff', '#ffffff', '#ff2bd6', '#ffe27a']), g: 0.05, ar: T.ar | 0 });
+  }
+  if (Math.random() < dt * 10) {
+    addPart({ k: 'flash', x: T.x + rand(-30, 30) * T.s, y: T.y - rand(80, 200) * T.s, life: 0.2, max: 0.2, size: rand(14, 26) * T.s, color: pick(['#00f0ff', '#ff2bd6']), ar: T.ar | 0 });
+  }
+  if (Math.random() < dt * 6) {
+    addPart({ k: 'conf', x: T.x + rand(-70, 70) * T.s, y: T.y - rand(120, 260) * T.s, vx: rand(-80, 80), vy: rand(40, 160), life: rand(0.8, 1.4), max: 1.4, size: rand(4, 8), color: pick(['#00f0ff', '#ffffff', '#ff2bd6', TEAMS[T.team].ui]), rot: rand(0, 6), vr: rand(-10, 10), g: 0.08, ar: T.ar | 0 });
+  }
+}
 function spawnBody(p, x, announce, invuln) {
   waitQ = waitQ.filter((q) => q !== p);
+  const comingBack = !!p.eliminated;
+  if (comingBack) {
+    p.baseHp = Math.max(p.baseHp || 0, LIKE_HP());
+  }
   const f = new Fighter(p.color, {
     x, y: FLOOR - 480, hp: totalHp(p), invuln: invuln ?? 0.85, dropIn: true,
     face: x < W / 2 ? 1 : -1, scale: arenaScale(),
@@ -2221,11 +2264,13 @@ function spawnBody(p, x, announce, invuln) {
   f.avatarRec = p.avatarRec || null;
   f.ar = SPAWN_AR; f.look = p.look; if (swordTierOf(p)) { f.setWeapon('sword'); f.swordTier = swordTierOf(p); }
   f.lastTouch = clock;
-  f.announce = announce || '';
-  p.fighter = f; p.queued = false;
+  f.announce = announce || (comingBack ? 'BACK IN!' : '');
+  f.spawnFx = comingBack || round.state === 'fight';
+  p.fighter = f; p.queued = false; p.eliminated = false;
   fighters.push(f);
   refitScale();
   sfx('heal', x, 0.4);
+  if (f.spawnFx) { ring(f.x, f.y - 200 * f.s, 50 * f.s, '#00f0ff', 0.3, 4); }
   return f;
 }
 function queuePlace(p) {
@@ -2244,13 +2289,22 @@ function enqueue(p) {
 function refuseQueue(p) {
   addFeed([[p.nick, (TEAMS[p.color] && TEAMS[p.color].ui) || '#fff'], [' cannot join — ' + pitMax() + ' fighting and ' + WAIT_MAX + ' reserved are full', '#ff8080']]);
 }
+function rejoinWait(p) { return Math.max(0, (p.rejoinReady || 0) - clock); }
+function sayCooldown(p) {
+  const wait = rejoinWait(p);
+  if (wait <= 0) return;
+  if (clock - (p.cdSaid || 0) < 0.85) return;
+  p.cdSaid = clock;
+  addFeed([[p.nick, (TEAMS[p.color] && TEAMS[p.color].ui) || '#fff'], [' back in ' + Math.ceil(wait) + 's', '#00f0ff']]);
+}
 function dropOrQueue(p, announce) {
   if (p.fighter && p.fighter.alive) return p.fighter;
+  if (round.state === 'fight' && rejoinWait(p) > 0) { sayCooldown(p); return null; }
   if (!p.isBot) freeSeatForReal();
   if (round.state !== 'end' && aliveCount() < pitMax()) {
-    p.eliminated = false;
-    const f = spawnDrop(p, announce);
-    if (f && !p.isBot) refereeSay(p.nick + ' drops in!');
+    const back = !!p.eliminated;
+    const f = spawnDrop(p, announce || (back ? 'BACK IN!' : ''));
+    if (f && !p.isBot) refereeSay(back ? (p.nick + ' is back in!') : (p.nick + ' drops in!'));
     if (!p.isBot) ensurePit();
     return f;
   }
@@ -2259,7 +2313,8 @@ function dropOrQueue(p, announce) {
   else if (spot === 'full') refuseQueue(p);
   return null;
 }
-// autobot-v2: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
+// autobot-v3: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
+// Mid-round: knocked-out viewers can comment, like or gift back in after REJOIN_COOLDOWN, at likeHp.
 const AUTO_BOT_FILL = 2;
 const BOT_ADJ = ['Volt', 'Glitch', 'Chrome', 'Pulse', 'Circuit', 'Cyber', 'Laser', 'Holo', 'Quark', 'Syntax', 'Zero', 'Hyper', 'Nova', 'Ion', 'Plasma', 'Pixel', 'Binary', 'Aether', 'Drift', 'Hex'];
 const BOT_NOUN = ['Runner', 'Spectre', 'Wisp', 'Rogue', 'Byte', 'Phantom', 'Spark', 'Knight', 'Echo', 'Fang', 'Rider', 'Viper', 'Ghost', 'Core', 'Pulse', 'Comet', 'Blade', 'Ace', 'Drifter', 'Wave'];
@@ -2435,7 +2490,7 @@ function beginCountdown() {
   round.n += 1; round.state = 'countdown'; round.t = 0; round.time = 0;
   round.beeps = 0; round.bowed = false; round.taunted = false; round.bantered = true;
   round.sudden = false; round.sdT = 0; round.winnerF = null; round.winner = -1; round.startedWith = 0;
-  round.timeUp = false; round.results = null; round.bossAt = G_().bossEvery || 90; round.bosses = 0; round.slayer = null; KING.f = null;
+  round.timeUp = false; round.results = null; round.holdT = 0; round.holdStart = 0; round.bossAt = G_().bossEvery || 90; round.bosses = 0; round.slayer = null; KING.f = null;
   resetRing();
   for (const q of roster.values()) { q.kos = 0; q.taken = 0; q.dealt = 0; q.lowest = 1; q.outAt = 0; q.place = 0; }
   ELIM.length = 0;
@@ -2451,7 +2506,7 @@ function startRound() {
 }
 function endRound(winner) {
   if (round.state === 'end') return;
-  round.state = 'end'; round.t = 0;
+  round.state = 'end'; round.t = 0; round.holdT = 0; round.holdStart = 0;
   round.winnerF = winner && winner.alive !== false ? winner : (winner || null);
   if (round.winnerF && !round.winnerF.alive) round.winnerF = fighters.find((f) => f.alive) || round.winnerF;
   round.winner = round.winnerF ? round.winnerF.team : -1;
@@ -2461,12 +2516,15 @@ function endRound(winner) {
   try { buildResults(); } catch (e) { showErr('results', e); }
   carryOver();
   if (round.winnerF) {
-    const p = round.winnerF.user;
+    const w = round.winnerF, p = w.user;
     if (p) p.wins = (p.wins || 0) + 1;
-    confetti(150, [TEAMS[round.winnerF.team].ui, '#00f0ff', '#ffffff', '#ff2bd6']);
-    const champName = round.winnerF.name || 'The winner';
+    w.invuln = 99;
+    if (w.onGround) w.play('victory', { keepFace: true });
+    confetti(160, [TEAMS[w.team].ui, '#00f0ff', '#ffffff', '#ff2bd6']);
+    for (let i = 0; i < 18; i++) addPart({ k: 'spark', x: w.x + rand(-80, 80), y: w.y - rand(40, 240) * w.s, vx: rand(-120, 120), vy: rand(-400, -40), life: rand(0.5, 1.1), max: 1.1, size: rand(3, 7), color: pick(['#00f0ff', '#ffffff', '#ff2bd6']), g: 0.04, ar: w.ar | 0 });
+    const champName = w.name || 'The winner';
     const champLine = champName + (round.timeUp ? ' wins on HP!' : ' is the last one standing!');
-    try { showTalk('win', { text: champLine, name: champName, who: round.winnerF, life: 6.4 }); } catch (e) {}
+    try { showTalk('win', { text: champLine, name: champName, who: w, life: 3.2 }); } catch (e) {}
     sfx('fanfare'); sfx('crowd');
   } else callout('DRAW!', 'NOBODY LEFT IN THE GRID', '#00f0ff', 120, 2);
 }
@@ -2520,10 +2578,14 @@ function updateRound(dt) {
     round.time += dt;
     const alive = fighters.filter((f) => f.alive);
     const fightersLeft = alive.filter((f) => !f.boss);
-    if (fightersLeft.length <= 1 && round.startedWith >= 2 && round.t > 0.45 && !waitQ.length) {
-      if (timeCtl.slowT <= 0.08) endRound(fightersLeft[0] || null);
-      return;
-    }
+    // Last one standing: hold briefly so knocked-out viewers can comment/like back in.
+    // If nobody does, the remaining fighter wins. The round timer is still the hard cap.
+    const lastStand = fightersLeft.length <= 1 && round.startedWith >= 2 && round.t > 0.45 && !waitQ.length;
+    if (lastStand) {
+      if (!round.holdStart) round.holdStart = clock;
+      round.holdT = clock - round.holdStart;   // real stream seconds, not slow-mo time
+      if (round.holdT >= LAST_STAND_HOLD && timeCtl.slowT <= 0.08) { endRound(fightersLeft[0] || null); return; }
+    } else { round.holdT = 0; round.holdStart = 0; }
     const limit = G_().roundSeconds || 300, rush = G_().finalRushSeconds ?? 30;
     if (!round.sudden && round.time > limit - rush) {
       round.sudden = true; round.sdT = 0;
@@ -2548,9 +2610,8 @@ function rememberNick(p, ev) {
   applyAvatar(p, ev);
 }
 function bringBack(p, announce) {
-  p.eliminated = false;
   if (p.fighter && p.fighter.alive) return p.fighter;
-  const back = dropOrQueue(p, announce, true);
+  const back = dropOrQueue(p, announce);
   maybeStart();
   return back;
 }
@@ -2677,7 +2738,7 @@ function onGift(ev) {
     p = makePlayer(ev, LIKE_HP());
     roster.set(id, p);
     applyAvatar(p, ev);
-  } else { rememberNick(p, ev); if (p.eliminated && (p.queued || aliveCount() < pitMax() || waitQ.length < WAIT_MAX)) p.eliminated = false; }
+  } else { rememberNick(p, ev); }
   p.bonusHp += reward;
   const tier0 = swordTierOf(p);
   p.coins += coins * count; p.lastSeen = clock;
@@ -3436,6 +3497,14 @@ function drawFighter(f) {
   const J = f.J, s = f.s;
   const aura = f.superT > 0 || f.auraT > 0 || teams[f.team].rageT > 0 || f.giant;
   if (aura) drawAura(f);
+  if (round.state === 'end' && f === round.winnerF) {
+    const pulse = 0.5 + 0.3 * Math.sin(clock * 10);
+    const g = ctx.createRadialGradient(f.x, f.y - 80 * s, 8 * s, f.x, f.y - 40 * s, 170 * s);
+    g.addColorStop(0, `rgba(0,240,255,${0.55 * pulse})`);
+    g.addColorStop(0.4, `rgba(255,43,214,${0.28 * pulse})`);
+    g.addColorStop(1, 'rgba(0,240,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y - 40 * s, 170 * s, 0, TAU); ctx.fill();
+  }
   for (const g of f.ghosts) { ctx.globalAlpha = g.life * 1.6; fillBody(g.J, s, aura ? `rgb(${TEAMS[f.team].aura})` : TEAMS[f.team].rear, 0); }
   ctx.globalAlpha = 1;
   drawTrails(f);
@@ -4047,6 +4116,14 @@ function drawBubbles() {
 function outlined(text, x, y, font, fill, stroke = '#000', lw = 8) {
   ctx.font = font; ctx.lineJoin = 'round'; ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.strokeText(text, x, y); ctx.fillStyle = fill; ctx.fillText(text, x, y);
 }
+function drawWinnerTag(x, y) {
+  const bounce = 1 + 0.1 * Math.sin(clock * 10);
+  ctx.save(); ctx.translate(x, y); ctx.scale(bounce, bounce); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = 'rgba(0,240,255,0.2)'; roundRect(-118, -46, 236, 58, 12); ctx.fill();
+  ctx.strokeStyle = '#ff2bd6'; ctx.lineWidth = 4; ctx.stroke();
+  outlined('WINNER', 0, 0, '48px Bangers, Impact, sans-serif', '#ffffff', '#007a88', 8);
+  ctx.restore();
+}
 // floating texts, name tags and HP bars are drawn in SCREEN space (always readable, also when zoomed in)
 function drawWorldUI() {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -4115,6 +4192,7 @@ function drawWorldUI() {
       ctx.save(); ctx.translate(p.x, p.y - 100 * zk); ctx.scale(sc, sc); ctx.rotate(-0.08);
       outlined(f.combo + ' HITS!', 0, 0, '38px Bangers, Impact', '#ffd84a', '#000', 6); ctx.restore();
     }
+    if (round.state === 'end' && f === round.winnerF) drawWinnerTag(p.x, ty - fs - 52);
   }
   for (const t of texts) {
     const p = w2s(t.x, t.y), a = clamp(t.life / t.max * 1.5, 0, 1), pop = 1 + Math.max(0, t.life - t.max + 0.12) * 4;
@@ -4323,7 +4401,7 @@ function drawHUD() {
     outlined(String(n), W / 2, 900, Math.round(200 * (1.25 - fr * 0.25)) + 'px Bangers, Impact, sans-serif', '#ffffff', '#1340a8', 14);
     ctx.globalAlpha = 1;
   }
-  if (round.state === 'end' && round.t > 0.3 && round.results) drawResults();
+  if (round.state === 'end' && round.t > RESULTS_LEAD && round.results) drawResults();
   else if (round.state === 'end' && round.t > 0.3) {
     const w = round.winnerF;
     const k = clamp(round.t * 3, 0, 1);
@@ -5082,59 +5160,64 @@ function buildResults() {
   round.results = { title: round.timeUp ? "TIME'S UP · MOST HP WINS" : 'LAST ONE STANDING', winner: w ? { nick: w.name, kos: (w.user && w.user.kos) || 0, hp: Math.round(w.hp), color: TEAMS[w.team].ui } : null, rows, awards, total: rows.length };
 }
 function drawResults() {
-  const R = round.results, k = clamp((round.t - 0.3) * 1.6, 0, 1), e = 1 - Math.pow(1 - k, 3);
+  const R = round.results; if (!R) return;
+  const k = clamp((round.t - RESULTS_LEAD) * 2.4, 0, 1), e = 1 - Math.pow(1 - k, 3);
+  if (e <= 0.01) return;
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.textAlign = 'center';
-  ctx.fillStyle = `rgba(6,0,18,${0.62 * e})`; ctx.fillRect(0, VIEW_TOP, W, VIEW_BOT - VIEW_TOP);
-  ctx.translate(W / 2, 1010); ctx.scale(lerp(0.85, 1, e), lerp(0.85, 1, e)); ctx.globalAlpha = e;
-  const top = -540, bh = 1180;
-  ctx.fillStyle = 'rgba(12,0,28,0.96)'; roundRect(-490, top, 980, bh, 20); ctx.fill();
-  ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 7; ctx.stroke();
-  outlined('NEON BRAWL  ·  SET ' + round.n, 0, top + 70, '56px Bangers, Impact, sans-serif', '#ffffff', '#ff2bd6', 10);
-  outlined(R.title, 0, top + 112, '28px Russo, Arial, sans-serif', '#00f0ff', '#000', 5);
-  // winner card
-  const wy = top + 150;
-  ctx.fillStyle = 'rgba(0,240,255,0.12)'; roundRect(-450, wy, 900, 170, 16); ctx.fill(); ctx.strokeStyle = 'rgba(255,43,214,0.85)'; ctx.lineWidth = 3; ctx.stroke();
+  // Dim only the upper arena so the winner stays visible on the floor, dancing.
+  const dim = ctx.createLinearGradient(0, VIEW_TOP, 0, 1080);
+  dim.addColorStop(0, `rgba(6,0,18,${0.52 * e})`);
+  dim.addColorStop(0.75, `rgba(6,0,18,${0.16 * e})`);
+  dim.addColorStop(1, 'rgba(6,0,18,0)');
+  ctx.fillStyle = dim; ctx.fillRect(0, VIEW_TOP, W, 1080 - VIEW_TOP);
+  const show = R.rows.slice(0, 5);
+  const extra = R.awards.length ? 86 : 0;
+  const bh = 268 + show.length * 44 + extra + (R.total > show.length ? 32 : 0);
+  ctx.translate(W / 2, VIEW_TOP + 18);
+  ctx.globalAlpha = e;
+  ctx.fillStyle = 'rgba(12,0,28,0.94)'; roundRect(-470, 0, 940, bh, 16); ctx.fill();
+  ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 6; ctx.stroke();
+  outlined('NEON BRAWL  ·  SET ' + round.n, 0, 48, '44px Bangers, Impact, sans-serif', '#ffffff', '#ff2bd6', 9);
+  outlined(R.title, 0, 82, '22px Russo, Arial, sans-serif', '#00f0ff', '#000', 4);
   if (R.winner) {
-    drawCrown(-36, wy + 62, 2.6, '#00f0ff');
-    let nfs = 78; ctx.font = nfs + 'px Bangers, Impact, sans-serif';
-    while (nfs > 40 && ctx.measureText(R.winner.nick).width > 820) { nfs -= 4; ctx.font = nfs + 'px Bangers, Impact, sans-serif'; }
-    outlined(R.winner.nick, 0, wy + 128, nfs + 'px Bangers, Impact, sans-serif', '#ffffff', R.winner.color, 9);
-    outlined('WINNER  ·  ' + R.winner.kos + ' KO' + (R.winner.kos === 1 ? '' : 's') + '  ·  ' + formatHp(R.winner.hp) + ' HP left', 0, wy + 160, '26px Russo, Arial, sans-serif', '#ffd84a', '#000', 5);
-  } else outlined('NO WINNER', 0, wy + 110, '70px Bangers, Impact, sans-serif', '#ffffff', '#000', 8);
-  // placements
-  let y = wy + 222;
+    ctx.fillStyle = 'rgba(0,240,255,0.12)'; roundRect(-440, 96, 880, 86, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,43,214,0.85)'; ctx.lineWidth = 3; ctx.stroke();
+    let nfs = 48; ctx.font = nfs + 'px Bangers, Impact, sans-serif';
+    const line = R.winner.nick + '  WINS';
+    while (nfs > 28 && ctx.measureText(line).width > 800) { nfs -= 2; ctx.font = nfs + 'px Bangers, Impact, sans-serif'; }
+    outlined(line, 0, 148, nfs + 'px Bangers, Impact, sans-serif', '#ffffff', R.winner.color, 7);
+    outlined(R.winner.kos + ' KO' + (R.winner.kos === 1 ? '' : 's') + '  ·  ' + formatHp(R.winner.hp) + ' HP left', 0, 172, '22px Russo, Arial, sans-serif', '#00f0ff', '#000', 4);
+  } else outlined('NO WINNER', 0, 150, '48px Bangers, Impact, sans-serif', '#ffffff', '#000', 7);
+  let y = 198;
   ctx.textAlign = 'left';
-  outlined('#', -430, y, '24px Russo, Arial', '#8ea3d6', '#000', 3); outlined('FIGHTER', -370, y, '24px Russo, Arial', '#8ea3d6', '#000', 3);
-  ctx.textAlign = 'right'; outlined('KOs', 250, y, '24px Russo, Arial', '#8ea3d6', '#000', 3); outlined('HP', 430, y, '24px Russo, Arial', '#8ea3d6', '#000', 3);
-  y += 14;
-  const show = R.rows.slice(0, 10);
+  outlined('#', -430, y, '20px Russo, Arial', '#b07cff', '#000', 3); outlined('FIGHTER', -380, y, '20px Russo, Arial', '#b07cff', '#000', 3);
+  ctx.textAlign = 'right'; outlined('KOs', 250, y, '20px Russo, Arial', '#b07cff', '#000', 3); outlined('HP', 430, y, '20px Russo, Arial', '#b07cff', '#000', 3);
   show.forEach((r, i) => {
-    const ry = y + 44 + i * 46, a = clamp((round.t - 0.6 - i * 0.08) * 4, 0, 1);
+    const ry = y + 36 + i * 44, a = clamp((round.t - RESULTS_LEAD - 0.12 - i * 0.05) * 5, 0, 1);
     ctx.globalAlpha = e * a;
-    if (i % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(-450, ry - 32, 900, 44); }
+    if (i % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(-440, ry - 28, 880, 40); }
     ctx.textAlign = 'left';
-    outlined(String(r.place), -430, ry, '30px Bangers, Impact', r.place === 1 ? '#ffd84a' : r.place <= 3 ? '#e6ebf5' : '#9fb0d8', '#000', 4);
+    outlined(String(r.place), -430, ry, '28px Bangers, Impact', r.place === 1 ? '#00f0ff' : r.place <= 3 ? '#e6ebf5' : '#b07cff', '#000', 4);
     const nm = r.nick.length > 18 ? r.nick.slice(0, 17) + '…' : r.nick;
-    outlined(nm, -370, ry, '30px Russo, Arial', r.color, '#000', 5);
+    outlined(nm, -380, ry, '26px Russo, Arial', r.color, '#000', 5);
     ctx.textAlign = 'right';
-    outlined(String(r.kos), 250, ry, '30px Russo, Arial', r.kos ? '#ffd84a' : '#9fb0d8', '#000', 4);
-    outlined(r.out ? 'KO' : formatHp(r.hp), 430, ry, '28px Russo, Arial', r.out ? '#ff8080' : '#7dffb0', '#000', 4);
+    outlined(String(r.kos), 250, ry, '26px Russo, Arial', r.kos ? '#00f0ff' : '#b07cff', '#000', 4);
+    outlined(r.out ? 'KO' : formatHp(r.hp), 430, ry, '24px Russo, Arial', r.out ? '#ff6adf' : '#7dffb0', '#000', 4);
   });
   ctx.globalAlpha = e;
-  if (R.total > show.length) { ctx.textAlign = 'center'; outlined('+ ' + (R.total - show.length) + ' more fighters', 0, y + 44 + show.length * 46, '22px Russo, Arial', '#8ea3d6', '#000', 3); }
-  // awards
-  const ay = top + bh - 30 - Math.ceil(R.awards.length / 2) * 92;
-  R.awards.forEach((aw, i) => {
-    const cx = (i % 2 ? 1 : -1) * 225, cy = ay + Math.floor(i / 2) * 92;
-    ctx.fillStyle = 'rgba(47,123,255,0.18)'; roundRect(cx - 215, cy, 430, 80, 16); ctx.fill(); ctx.strokeStyle = '#2f7bff'; ctx.lineWidth = 2; ctx.stroke();
+  let foot = y + 36 + show.length * 44;
+  if (R.total > show.length) { ctx.textAlign = 'center'; outlined('+ ' + (R.total - show.length) + ' more fighters', 0, foot, '20px Russo, Arial', '#b07cff', '#000', 3); foot += 28; }
+  R.awards.slice(0, 2).forEach((aw, i) => {
+    const cx = (i % 2 ? 1 : -1) * 215, cy = foot + 8;
+    ctx.fillStyle = 'rgba(255,43,214,0.14)'; roundRect(cx - 200, cy, 400, 62, 10); ctx.fill(); ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 2; ctx.stroke();
     ctx.textAlign = 'center';
-    outlined(aw[0], cx, cy + 26, '24px Bangers, Impact', '#7fb2ff', '#000', 4);
+    outlined(aw[0], cx, cy + 22, '20px Bangers, Impact', '#00f0ff', '#000', 3);
     const nm = aw[1].length > 16 ? aw[1].slice(0, 15) + '…' : aw[1];
-    outlined(nm + '  ·  ' + aw[2], cx, cy + 60, '23px Russo, Arial', '#ffffff', '#000', 4);
+    outlined(nm + '  ·  ' + aw[2], cx, cy + 48, '18px Russo, Arial', '#ffffff', '#000', 3);
   });
   ctx.textAlign = 'center';
   const nx = Math.max(0, Math.ceil(RESULTS_SECONDS - round.t));
-  outlined('NEXT ROUND IN ' + nx + '  ·  GIFT HP + SWORDS CARRY OVER IF YOU STAY', 0, top + bh + 44, '24px Russo, Arial', '#ffe08a', '#000', 5);
+  outlined('NEXT SET IN ' + nx, 0, bh - 18, '24px Russo, Arial', '#ff9ae8', '#000', 5);
   ctx.restore(); ctx.globalAlpha = 1; ctx.textAlign = 'center';
 }
 // ---------- carry-over: gift HP + sword stay if you are still here (fighting, in the reserved seats,
@@ -5346,6 +5429,7 @@ function drawTagsHalf(ar, R, list) {
       ctx.save(); ctx.translate(clamp(it.hx, 90, W - 90), Math.max(R.y + 110, top - 22)); ctx.scale(sc, sc); ctx.rotate(-0.08);
       outlined(f.combo + ' HITS!', 0, 0, '34px Bangers, Impact', '#ffd84a', '#000', 6); ctx.restore();
     }
+    if (round.state === 'end' && f === round.winnerF) drawWinnerTag(clamp(it.hx, 120, W - 120), Math.max(R.y + 70, top - 56));
   }
   for (const t of texts) {
     if ((t.ar | 0) !== ar) continue;
@@ -5417,8 +5501,12 @@ function drawSlimHUD() {
   ctx.fillStyle = botG; ctx.fillRect(0, VIEW_BOT, W, H - VIEW_BOT);
   ctx.fillStyle = line; ctx.fillRect(0, VIEW_BOT, W, 4);
   ctx.textAlign = 'left';
-  const phase = round.state === 'fight' && round.sudden ? 'OVERDRIVE · MOST HP AT 0:00' : SPLIT.final ? 'FINAL GRID' : 'HOLD THE GRID';
-  outlined(phase, 22, VIEW_BOT + 36, '26px Russo, Arial, sans-serif', '#00f0ff', '#000', 5);
+  const holding = round.state === 'fight' && (round.holdT || 0) > 0;
+  const phase = holding ? ('LAST STANDING · JUMP BACK IN ' + Math.max(1, Math.ceil(LAST_STAND_HOLD - round.holdT)))
+    : round.state === 'fight' && round.sudden ? 'OVERDRIVE · MOST HP AT 0:00'
+    : SPLIT.final ? 'FINAL GRID'
+    : 'HOLD THE GRID · LIKE OR COMMENT TO COME BACK';
+  outlined(phase, 22, VIEW_BOT + 36, '26px Russo, Arial, sans-serif', holding ? '#ffffff' : '#00f0ff', '#000', 5);
   if (round.state === 'fight' || round.state === 'countdown') {
     const pct = Math.round((RING.r / RING.rMax) * 100);
     ctx.textAlign = 'right';
@@ -5448,7 +5536,12 @@ function drawSlimHUD() {
     outlined(String(n), W / 2, VIEW_CY + 70, Math.round(200 * (1.25 - fr * 0.25)) + 'px Bangers, Impact, sans-serif', '#ffffff', '#00f0ff', 14);
     ctx.globalAlpha = 1;
   }
-  if (round.state === 'end' && round.t > 0.3 && round.results) drawResults();
+  if (round.state === 'fight' && (round.holdT || 0) > 0.15) {
+    const left = Math.max(1, Math.ceil(LAST_STAND_HOLD - round.holdT));
+    outlined('LAST STANDING', W / 2, VIEW_CY - 80, '72px Bangers, Impact, sans-serif', '#ffffff', '#ff2bd6', 12);
+    outlined('COMMENT OR LIKE TO JUMP BACK IN  ·  ' + left, W / 2, VIEW_CY - 8, '32px Russo, Arial, sans-serif', '#00f0ff', '#000', 6);
+  }
+  if (round.state === 'end' && round.t > RESULTS_LEAD && round.results) drawResults();
   for (let i = 0; i < callouts.length; i++) {
     const c = callouts[i], age = c.max - c.life, k = clamp(age * 6, 0, 1), a = clamp(c.life * 3, 0, 1);
     const y = VIEW_CY - 10 - (callouts.length - 1 - i) * 130;
@@ -5526,7 +5619,7 @@ async function boot() {
   safe('round', startRound);
   window.SF = {
     step: (n = 1, fps = 30) => { for (let i = 0; i < n; i++) tick(1 / fps); render(); },
-    event: onEvent, round, fighters: () => fighters, roster, supporters, sim, simGift, simJoin, simLikes, simLikeNew, simCommentNew, simCommentAgain, simFollowNew, showTalk, talk, pitMax, waitMax: () => WAIT_MAX, placeholderAvatar, AUTO_BOT_FILL, isBotP, ensurePit,
+    event: onEvent, round, fighters: () => fighters, roster, supporters, sim, simGift, simJoin, simLikes, simLikeNew, simLikeAgain, simCommentNew, simCommentAgain, simFollowNew, showTalk, talk, pitMax, waitMax: () => WAIT_MAX, placeholderAvatar, AUTO_BOT_FILL, isBotP, ensurePit, REJOIN_COOLDOWN, REJOIN_INVULN, LAST_STAND_HOLD, RESULTS_SECONDS,
     knockOut: (name) => {
       const f = fighters.find((x) => x.alive && (!name || x.name === name || x.viewerId === name));
       if (!f) return null;
@@ -5554,7 +5647,7 @@ async function boot() {
       fighters: fighters.filter((f) => f.alive).map((f) => ({ id: f.viewerId, name: f.name, hp: Math.round(f.hp), max: Math.round(f.maxHp), boss: !!f.boss, sword: f.swordTier || 0, gender: f.look && f.look.gender, inv: +f.invuln.toFixed(2), mv: f.mv ? f.mv.name : '', touch: +(clock - (f.lastTouch || 0)).toFixed(1), ar: f.ar | 0 })),
       split: SPLIT.mode, final: SPLIT.final, time: +round.time.toFixed(1), sudden: round.sudden, clock: +clock.toFixed(2),
       waiting: waitQ.length, waitMax: WAIT_MAX, wait: waitQ.map((q) => q.nick),
-      roster: [...roster.values()].map((pl) => ({ id: pl.id, nick: pl.nick, base: pl.baseHp, bonus: pl.bonusHp, coins: pl.coins, queued: !!pl.queued, eliminated: !!pl.eliminated, kos: pl.kos, gender: pl.gender, bot: !!pl.isBot })),
+      roster: [...roster.values()].map((pl) => ({ id: pl.id, nick: pl.nick, base: pl.baseHp, bonus: pl.bonusHp, coins: pl.coins, queued: !!pl.queued, eliminated: !!pl.eliminated, rejoinIn: +Math.max(0, (pl.rejoinReady||0)-clock).toFixed(2), kos: pl.kos, gender: pl.gender, bot: !!pl.isBot })),
       ref: { q: REF.q.slice(), playing: REF.playing, blocked: REF.blocked }
     }),
     mostHurt: () => { let b = -1, bh = 1e9; for (let t = 0; t < NT; t++) { const h = heroOf(t); if (h && h.hp < bh) { bh = h.hp; b = t; } } return b; },
