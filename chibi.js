@@ -205,8 +205,13 @@ function drawChibi(g, J, s, face, L, o = {}) {
   chibiHairBack(g, R, L, fl);
   g.fillStyle = CHIBI.OUT; g.beginPath(); g.arc(0, 0, R + 3.2 * s, 0, TAU); g.fill();
   g.fillStyle = F(L.skin); g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
-  if (!fl && !lod) { g.fillStyle = 'rgba(160,80,60,0.13)'; g.beginPath(); g.arc(-R * 0.18, R * 0.12, R * 0.9, Math.PI * 0.4, Math.PI * 1.2); g.fill(); }
-  if (!fl) chibiFace(g, R, L, o.expr || 'normal', o.talk || 0, lod);
+  if (!fl && !lod && !o.avatar) { g.fillStyle = 'rgba(160,80,60,0.13)'; g.beginPath(); g.arc(-R * 0.18, R * 0.12, R * 0.9, Math.PI * 0.4, Math.PI * 1.2); g.fill(); }
+  if (!fl && o.avatar) {
+    // viewer DP, clipped to the chibi head circle; hair still frames the photo
+    g.save(); g.beginPath(); g.arc(0, 0, R, 0, TAU); g.clip();
+    g.drawImage(o.avatar, -R, -R, R * 2, R * 2);
+    g.restore();
+  } else if (!fl) chibiFace(g, R, L, o.expr || 'normal', o.talk || 0, lod);
   chibiHairFront(g, R, L, fl, lod);
   g.restore();
   // front arm on top (guard sits in front of the chin like a boxer)

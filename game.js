@@ -1,7 +1,8 @@
 /* CHIBI CLASH - free-for-all chibi brawl for TikTok LIVE Studio (PC, 1080x1920 Link source).
    Fight engine (motion, choreography, hits, reactions, effects) = the original STICK FIGHT game.js, unchanged.
    Hybrid changes: chibi skin (chibi.js), TikFinity local events (live.js), 30 fighting + 80 reserved, 5:00 rounds,
-   1 coin = +30 HP, gift swords, KING crown, BOSS, FINAL RUSH, results board, carry-over. No server needed. */
+   1 coin = +30 HP, gift swords, KING crown, BOSS, FINAL RUSH, results board, carry-over. No server needed.
+   autobot-v1: always keep 2 fighters (AI fillers with generated names); real viewers use TikTok DP as the chibi face. */
 'use strict';
 
 // ============================================================ setup
@@ -2028,7 +2029,7 @@ function makeRagdoll(f, vx, vy) {
     pts.push({ x: q.x, y: q.y, px: q.x - v.x * dt0, py: q.y - v.y * dt0 });
   });
   const cons = RD_CONS.map(([a, b]) => [a, b, Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y)]);
-  return { pts, cons, team: f.team, s: f.s, life: 5, pdt: dt0, hr: J.hr, flash: 0.12, look: f.look, face: f.face, ar: f.ar | 0 };
+  return { pts, cons, team: f.team, s: f.s, life: 5, pdt: dt0, hr: J.hr, flash: 0.12, look: f.look, face: f.face, ar: f.ar | 0, avatarRec: f.avatarRec || null };
 }
 function updateRagdoll(r, dt) {
   if (dt <= 0) return;
@@ -2156,7 +2157,8 @@ function makePlayer(ev, baseHp) {
     color: pickColor(),
     baseHp, bonusHp: 0, coins: 0, wins: 0,
     fighter: null, queued: false, eliminated: false, avatarUrl: '', avatarRec: null,
-    gender: '', look: null, lastSeen: clock, kos: 0, taken: 0, dealt: 0, lowest: 1, joinedAt: clock
+    gender: '', look: null, lastSeen: clock, kos: 0, taken: 0, dealt: 0, lowest: 1, joinedAt: clock,
+    isBot: !!(ev && ev.isBot)
   }, ev);
 }
 function arenaScale(n) {
@@ -2246,16 +2248,87 @@ function refuseQueue(p) {
 }
 function dropOrQueue(p, announce) {
   if (p.fighter && p.fighter.alive) return p.fighter;
+  if (!p.isBot) freeSeatForReal();
   if (round.state !== 'end' && aliveCount() < pitMax()) {
     p.eliminated = false;
     const f = spawnDrop(p, announce);
-    if (f) refereeSay(p.nick + ' drops in!');
+    if (f && !p.isBot) refereeSay(p.nick + ' drops in!');
+    if (!p.isBot) ensurePit();
     return f;
   }
   const spot = enqueue(p);
   if (spot === 'queued') addFeed([[p.nick, (TEAMS[p.color] && TEAMS[p.color].ui) || '#fff'], [' waiting ' + waitQ.length + '/' + WAIT_MAX, '#ffd84a']]);
   else if (spot === 'full') refuseQueue(p);
   return null;
+}
+// autobot-v1: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
+const AUTO_BOT_FILL = 2;
+const BOT_ADJ = ['Shadow', 'Bolt', 'Fire', 'Storm', 'Neon', 'Frost', 'Turbo', 'Lucky', 'Pixel', 'Blaze', 'Aqua', 'Thunder', 'Nova', 'Rapid', 'Cosmic', 'Iron', 'Wild', 'Solar', 'Night', 'Crimson'];
+const BOT_NOUN = ['Ninja', 'Fox', 'Wolf', 'Hawk', 'Tiger', 'Dash', 'Spark', 'Knight', 'Panda', 'Fang', 'Rocket', 'Viper', 'Ghost', 'Star', 'Punch', 'Comet', 'Drift', 'Ace', 'Katana', 'Beat'];
+function isBotP(p) { return !!(p && p.isBot); }
+function isBotF(f) { return !!(f && f.user && f.user.isBot); }
+function liveBots() { return fighters.filter((f) => f.alive && !f.boss && isBotF(f)); }
+function uniqueBotName() {
+  const used = new Set([...roster.values()].map((p) => String(p.nick || '').toLowerCase()));
+  for (let i = 0; i < 48; i++) {
+    const nick = (BOT_ADJ[Math.floor(Math.random() * BOT_ADJ.length)] + BOT_NOUN[Math.floor(Math.random() * BOT_NOUN.length)] + (Math.random() < 0.45 ? String(10 + Math.floor(Math.random() * 90)) : '')).slice(0, 18);
+    if (!used.has(nick.toLowerCase())) return nick;
+  }
+  return 'Bot' + (100 + Math.floor(Math.random() * 900));
+}
+function makeBot() {
+  const nick = uniqueBotName();
+  const ev = { id: 'bot:' + nick.toLowerCase(), nick, avatar: '', isBot: true };
+  const p = makePlayer(ev, LIKE_HP());
+  p.isBot = true;
+  roster.set(p.id, p);
+  return p;
+}
+function dismissBot(p) {
+  if (!isBotP(p)) return;
+  const f = p.fighter;
+  if (f) {
+    f.alive = false; f.hidden = true; f.user = null;
+    fighters = fighters.filter((x) => x !== f);
+    p.fighter = null;
+  }
+  waitQ = waitQ.filter((q) => q !== p);
+  p.queued = false;
+  roster.delete(p.id);
+  refitScale();
+}
+function freeQueuedBots() {
+  for (const b of waitQ.slice()) if (isBotP(b)) dismissBot(b);
+}
+function freeSeatForReal() {
+  freeQueuedBots();
+  if (aliveCount() < pitMax()) return true;
+  const bots = liveBots();
+  if (!bots.length) return false;
+  dismissBot(bots[0].user);
+  return aliveCount() < pitMax();
+}
+let _ensuringPit = false;
+function ensurePit() {
+  if (_ensuringPit || round.state === 'end') return;
+  _ensuringPit = true;
+  try {
+    freeQueuedBots();
+    const realAlive = fighters.reduce((n, f) => n + (f.alive && !f.boss && f.user && !f.user.isBot ? 1 : 0), 0);
+    const bots = liveBots();
+    const keep = Math.max(0, AUTO_BOT_FILL - realAlive);
+    // In lobby/countdown, swap bots out the moment a real can take the seat.
+    // Mid-fight, leave a surplus bot until the next round (real takes the slot then),
+    // unless the pit is full and a real needs the seat (handled by freeSeatForReal).
+    if (round.state === 'lobby' || round.state === 'countdown') {
+      for (let i = keep; i < bots.length; i++) dismissBot(bots[i].user);
+      while (aliveCount() < AUTO_BOT_FILL) {
+        const p = makeBot();
+        spawnDrop(p, '');
+      }
+    }
+    maybeStart();
+  } finally { _ensuringPit = false; }
 }
 function tryDropQueued() {
   if (round.state === 'end') return;
@@ -2276,11 +2349,13 @@ function tryDropQueued() {
 function spawnRoster() {
   // The champion stays. Knocked-out players are eliminated and are not in this list.
   // Only the champion still has gifted HP here (see clearGiftsExceptChampion). The new body is a full bar of base + those gifts.
-  const champ = round.winnerF && round.winnerF.user && !round.winnerF.user.eliminated ? round.winnerF.user : null;
+  let champ = round.winnerF && round.winnerF.user && !round.winnerF.user.eliminated ? round.winnerF.user : null;
   fighters = [];
   ragdolls.length = 0;
   waitQ = [];
-  const rest = [...roster.values()].filter((p) => !p.eliminated && p !== champ);
+  for (const p of [...roster.values()]) if (isBotP(p)) { p.fighter = null; p.queued = false; roster.delete(p.id); }
+  if (champ && isBotP(champ)) champ = null;
+  const rest = [...roster.values()].filter((p) => !p.eliminated && !isBotP(p) && p !== champ);
   for (const p of rest) { p.queued = false; p.fighter = null; }
   if (champ) { champ.queued = false; champ.eliminated = false; champ.fighter = null; }
   const order = [];
@@ -2318,8 +2393,8 @@ function beginCountdown() {
 function startRound() {
   round.n = 0; round.state = 'lobby'; round.t = 0; round.time = 0;
   round.winnerF = null; round.winner = -1; round.startedWith = 0; round.bantered = false;
-  if (!roster.size) fighters = [];
-  maybeStart();
+  if (![...roster.values()].some((p) => !p.isBot)) fighters = [];
+  ensurePit();
 }
 function endRound(winner) {
   if (round.state === 'end') return;
@@ -2359,14 +2434,16 @@ function openNextRound() {
   bullets.length = 0; bombs.length = 0; planes.length = 0; strikeQueue.length = 0;
   endSetPiece(); GT.length = 0; bubbles.length = 0; cam.ko = null;
   spawnRoster();
-  if (aliveCount() >= 2) beginCountdown();
-  else { round.state = 'lobby'; round.t = 0; round.winnerF = null; round.winner = -1; }
+  // leave 'end' so ensurePit can fill bots; maybeStart then begins the countdown once
+  round.state = 'lobby'; round.t = 0; round.winnerF = null; round.winner = -1;
+  ensurePit();
 }
 function updateRound(dt) {
   round.t += dt;
   tryDropQueued();
-  if (round.state === 'lobby') { maybeStart(); return; }
+  if (round.state === 'lobby') { ensurePit(); return; }
   if (round.state === 'countdown') {
+    if (aliveCount() < AUTO_BOT_FILL) ensurePit();
     while (round.beeps < 3 && round.t >= round.beeps * 0.8) { round.beeps++; sfx('beep'); }
     if (!round.taunted && round.t > 0.2) {
       round.taunted = true;
@@ -2445,6 +2522,7 @@ function onComment(ev) {
     maybeStart();
     return;
   }
+  freeSeatForReal();
   if (aliveCount() >= pitMax() && waitQ.length >= WAIT_MAX) {
     addFeed([[String(ev.nick || 'someone').slice(0, 18), '#c9d6ff'], [' cannot join — line is full', '#ff8080']]);
     return;
@@ -2471,6 +2549,7 @@ function onLike(ev) {
     if (back) addFeed([[p.nick, TEAMS[p.color].ui], [' liked back in', '#ff9cc4']]);
     return;
   }
+  freeSeatForReal();
   if (aliveCount() >= pitMax() && waitQ.length >= WAIT_MAX) {
     addFeed([[String(ev.nick || 'someone').slice(0, 18), '#ff9cc4'], [' cannot join — line is full', '#ff8080']]);
     return;
@@ -2974,12 +3053,17 @@ const avatarCache = new Map();
 function loadAvatar(url) {
   const raw = String(url || '').trim();
   if (!raw) return null;
-  const src = /^data:image\//i.test(raw) ? raw : '/avatar?u=' + encodeURIComponent(raw);
+  if (!/^https?:\/\//i.test(raw) && !/^data:image\//i.test(raw)) return null;
+  const src = raw;
   if (avatarCache.has(src)) return avatarCache.get(src);
   const img = new Image();
   const rec = { img, fail: false };
-  img.onload = () => { rec.fail = !img.naturalWidth; if (!rec.fail) rec.circle = circleCrop(img); };
+  img.onload = () => {
+    rec.fail = !img.naturalWidth;
+    if (!rec.fail) { try { rec.circle = circleCrop(img); } catch (e) { rec.fail = true; } }
+  };
   img.onerror = () => { rec.fail = true; };
+  if (!/^data:image\//i.test(raw)) { img.referrerPolicy = 'no-referrer'; }
   img.src = src;
   avatarCache.set(src, rec);
   return rec;
@@ -3023,9 +3107,14 @@ function applyAvatar(p, ev) {
   if (p.fighter) p.fighter.avatarRec = p.avatarRec;
 }
 function avatarReady(f) {
-  return false;   // CHIBI CLASH: the chibi face is the face (no profile photo on the head)
   const rec = f && f.avatarRec, img = rec && rec.img;
   return !!(img && !rec.fail && img.complete && img.naturalWidth);
+}
+function avatarImage(f) {
+  if (!avatarReady(f)) return null;
+  const rec = f.avatarRec;
+  if (!rec.circle && rec.img) { try { rec.circle = circleCrop(rec.img); } catch (e) { rec.fail = true; return null; } }
+  return rec.circle || null;
 }
 function drawAvatarBadges() {
   const live = fighters.filter((f) => f.alive && f.J && f.J.head && avatarReady(f));
@@ -3255,7 +3344,7 @@ function drawFighter(f) {
   if (f.look) {
     if (f === KING.f) drawKingGlow(f);
     ctx.globalAlpha = blink ? 0.7 : 1;
-    drawChibi(ctx, J, s, f.face * (f.spinFace || 1), f.look, { flash: f.flash > 0, expr: chibiExpr(f, lying), talk: ta });
+    drawChibi(ctx, J, s, f.face * (f.spinFace || 1), f.look, { flash: f.flash > 0, expr: chibiExpr(f, lying), talk: ta, avatar: avatarImage(f) });
     ctx.globalAlpha = 1;
   } else drawBody(J, f.team, s, f.flash > 0, blink ? 0.7 : 1);
   drawWeapon(f);
@@ -3276,7 +3365,7 @@ function drawRagdoll(r) {
   const J = {}; RD_KEYS.forEach((k, i) => (J[k] = r.pts[i])); J.hr = r.hr;
   if (!r.look) { drawBody(J, r.team, r.s, r.flash > 0, clamp(r.life, 0, 1)); return; }
   ctx.globalAlpha = clamp(r.life, 0, 1);
-  drawChibi(ctx, J, r.s, r.face || 1, r.look, { flash: r.flash > 0, expr: 'ko' });
+  drawChibi(ctx, J, r.s, r.face || 1, r.look, { flash: r.flash > 0, expr: 'ko', avatar: avatarImage(r) });
   ctx.globalAlpha = 1;
 }
 function drawPlane(p) {
@@ -5289,7 +5378,7 @@ async function boot() {
   safe('round', startRound);
   window.SF = {
     step: (n = 1, fps = 30) => { for (let i = 0; i < n; i++) tick(1 / fps); render(); },
-    event: onEvent, round, fighters: () => fighters, roster, supporters, sim, simGift, simJoin, simLikes, simLikeNew, simCommentNew, simCommentAgain, simFollowNew, showTalk, talk, pitMax, waitMax: () => WAIT_MAX, placeholderAvatar,
+    event: onEvent, round, fighters: () => fighters, roster, supporters, sim, simGift, simJoin, simLikes, simLikeNew, simCommentNew, simCommentAgain, simFollowNew, showTalk, talk, pitMax, waitMax: () => WAIT_MAX, placeholderAvatar, AUTO_BOT_FILL, isBotP, ensurePit,
     knockOut: (name) => {
       const f = fighters.find((x) => x.alive && (!name || x.name === name || x.viewerId === name));
       if (!f) return null;
@@ -5317,7 +5406,7 @@ async function boot() {
       fighters: fighters.filter((f) => f.alive).map((f) => ({ id: f.viewerId, name: f.name, hp: Math.round(f.hp), max: Math.round(f.maxHp), boss: !!f.boss, sword: f.swordTier || 0, gender: f.look && f.look.gender, inv: +f.invuln.toFixed(2), mv: f.mv ? f.mv.name : '', touch: +(clock - (f.lastTouch || 0)).toFixed(1), ar: f.ar | 0 })),
       split: SPLIT.mode, final: SPLIT.final, time: +round.time.toFixed(1), sudden: round.sudden, clock: +clock.toFixed(2),
       waiting: waitQ.length, waitMax: WAIT_MAX, wait: waitQ.map((q) => q.nick),
-      roster: [...roster.values()].map((pl) => ({ id: pl.id, nick: pl.nick, base: pl.baseHp, bonus: pl.bonusHp, coins: pl.coins, queued: !!pl.queued, eliminated: !!pl.eliminated, kos: pl.kos, gender: pl.gender })),
+      roster: [...roster.values()].map((pl) => ({ id: pl.id, nick: pl.nick, base: pl.baseHp, bonus: pl.bonusHp, coins: pl.coins, queued: !!pl.queued, eliminated: !!pl.eliminated, kos: pl.kos, gender: pl.gender, bot: !!pl.isBot })),
       ref: { q: REF.q.slice(), playing: REF.playing, blocked: REF.blocked }
     }),
     mostHurt: () => { let b = -1, bh = 1e9; for (let t = 0; t < NT; t++) { const h = heroOf(t); if (h && h.hp < bh) { bh = h.hp; b = t; } } return b; },
