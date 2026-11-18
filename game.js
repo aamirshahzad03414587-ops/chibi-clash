@@ -2,7 +2,7 @@
    Fight engine (motion, choreography, hits, reactions, effects) = the original STICK FIGHT game.js, unchanged.
    Hybrid changes: chibi skin (chibi.js), TikFinity local events (live.js), 30 fighting + 80 reserved, 5:00 rounds,
    1 coin = +30 HP, gift swords, KING crown, BOSS, FINAL RUSH, results board, carry-over. No server needed.
-   autobot-v1: always keep 2 fighters (AI fillers with generated names); real viewers use TikTok DP as the chibi face. */
+   autobot-v2: always keep 2 fighters (AI fillers with generated names); real viewers use TikTok DP as the chibi face. */
 'use strict';
 
 // ============================================================ setup
@@ -12,7 +12,7 @@ const W = 1080, H = 1920, FLOOR = 1540, G = 3300;
 const VIEW_TOP = 112, VIEW_BOT = 1844, VIEW_CY = 978;   // CHIBI CLASH: slim HUD, max arena space   // fight window between the slim top and bottom HUD
 let BASE_S = 1.1;     // about 28% smaller than the glove-pass size, and slimmer. config.json game.fighterSize
 let GIANT_S = 1.6;
-const DMG_SCALE = 1.6; // global damage tuning (config "damage" multiplies this)
+const DMG_SCALE = 0.8; // global damage tuning (config "damage" multiplies this)
 const QS = new URLSearchParams(location.search);
 // v11: remember the TikTok name. A link with ?user=NAME (or /u/NAME) is saved on this phone/PC; opening the game with no name
 // (Home Screen icon, bare link) uses the saved name + clean mode again. ?user=reset forgets it.
@@ -2261,7 +2261,7 @@ function dropOrQueue(p, announce) {
   else if (spot === 'full') refuseQueue(p);
   return null;
 }
-// autobot-v1: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
+// autobot-v2: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
 const AUTO_BOT_FILL = 2;
 const BOT_ADJ = ['Shadow', 'Bolt', 'Fire', 'Storm', 'Neon', 'Frost', 'Turbo', 'Lucky', 'Pixel', 'Blaze', 'Aqua', 'Thunder', 'Nova', 'Rapid', 'Cosmic', 'Iron', 'Wild', 'Solar', 'Night', 'Crimson'];
 const BOT_NOUN = ['Ninja', 'Fox', 'Wolf', 'Hawk', 'Tiger', 'Dash', 'Spark', 'Knight', 'Panda', 'Fang', 'Rocket', 'Viper', 'Ghost', 'Star', 'Punch', 'Comet', 'Drift', 'Ace', 'Katana', 'Beat'];
@@ -4826,7 +4826,7 @@ function connectWS() {
 
 // ============================================================ CHIBI CLASH hybrid systems
 // looks (girl/boy), gift swords, KO stats, KING crown, BOSS, results board, carry-over
-const RESULTS_SECONDS = 11;
+const RESULTS_SECONDS = 3;
 const ELIM = [];                 // players in the order they were knocked out this round
 const KING = { f: null };
 function withLook(p, ev) {
