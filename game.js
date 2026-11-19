@@ -2,7 +2,7 @@
    Fight engine (motion, choreography, hits, reactions, effects) = the original STICK FIGHT game.js, unchanged.
    Hybrid changes: chibi skin (chibi.js), TikFinity local events (live.js), 30 fighting + 80 reserved, 5:00 rounds,
    1 coin = +30 HP, gift swords, KING crown, BOSS, FINAL RUSH, results board, carry-over. No server needed.
-   autobot-v3: always 2 fighters, viewer DP faces, winner dance, mid-round rejoin (comment/like/gift). */
+   autobot-v4: upright winner dance (shuffle / fist-pump / wave, no body flip), mid-round rejoin, viewer DP faces. */
 'use strict';
 
 // ============================================================ setup
@@ -676,9 +676,15 @@ const POSES = {
   taunt1:  P(0.05, 1.5, 2.9, 0.4, 2.8, 0.42, 0.18, -0.3, -0.48),       // "come on" beckon
   taunt2:  P(0.05, 1.5, 1.9, 0.4, 2.8, 0.42, 0.18, -0.3, -0.48),
   cheer:   P(0, 2.7, 3.0, 2.5, 2.9, 0.25, 0.05, -0.25, -0.35),
-  danceUp:   P(-0.18, 2.85, 3.2, 2.6, 3.05, 0.62, 0.08, -0.12, -0.55),  // both arms up, hop
-  dancePump: P(0.1, 2.55, 2.7, 0.35, 2.6, 0.25, 0.05, -0.35, -0.55),   // fist pump
-  danceHip:  P(0.06, 2.3, 2.85, 2.15, 2.55, 0.7, 0.15, 0.15, -0.45),   // hip sway
+  danceUp:   P(-0.06, 2.85, 3.15, 0.2, 0.35, 0.35, 0.06, -0.22, -0.4),
+  dShufL:    P(0.14, 3.05, 3.2, 0.2, 0.35, 0.72, 0.12, -0.06, -0.4),    // lead fist straight up, rear arm hangs
+  dHopL:     P(0.06, 2.85, 3.05, 0.25, 0.4, 0.22, 0.0, -0.16, -0.18),   // hop, same arms, legs extend
+  dShufR:    P(-0.14, 0.2, 0.35, 3.05, 3.2, 0.16, 0.0, -0.7, -0.12),    // rear fist straight up, lead arm hangs
+  dHopR:     P(-0.06, 0.25, 0.4, 2.85, 3.05, 0.18, 0.0, -0.18, -0.16),
+  dWaveL:    P(0.12, 2.55, 3.4, 0.2, 0.4, 0.68, 0.1, -0.08, -0.38),     // lead arm high wave, rear down
+  dHopWaveL: P(0.04, 2.35, 2.05, 0.25, 0.45, 0.2, 0.0, -0.16, -0.2),    // forearm flicks the other way
+  dWaveR:    P(-0.12, 0.2, 0.4, 2.55, 3.4, 0.14, 0.0, -0.66, -0.1),     // rear arm high wave, lead down
+  dHopWaveR: P(-0.04, 0.25, 0.45, 2.35, 2.05, 0.18, 0.0, -0.18, -0.16),
   chinA:   P(-0.04, 0.35, 0.6, 1.15, 3.0, 0.3, 0.08, -0.25, -0.35),      // thumb wipes the chin
   chinB:   P(-0.08, 0.35, 0.6, 1.3, 3.45, 0.3, 0.08, -0.25, -0.35),
   neckA:   P(0.02, 2.25, 3.9, 2.05, 3.7, 0.32, 0.1, -0.28, -0.38),       // hands on the head, neck crack
@@ -782,10 +788,10 @@ const MV = {
   iaiReady: { dur: 0.55, fr: [[0, '*'], [0.25, 'swIaiW', 'in'], [0.55, 'swIaiW']], snd: [[0.1, 'iai']] },
   iaiCut: { dur: 0.9, pass: true, fr: [[0, '*'], [0.05, 'swIaiA', 'out'], [0.9, 'swIaiA']], snd: [[0, 'swing'], [0.02, 'kiai']] },
   sheath: { dur: 0.7, fr: [[0, '*'], [0.3, 'swSheath'], [0.55, 'swSheath'], [0.7, 'base']], snd: [[0.5, 'clang', 0.5]] },
-  victory: { dur: 1.15, next: 'victory',
-    fr: [[0, 'cheer'], [0.16, 'danceUp', 'out'], [0.38, 'dancePump'], [0.58, 'danceUp', 'out'], [0.8, 'danceHip'], [1.15, 'cheer']],
-    imp: [[0.08, 0, -780], [0.6, 0, -720]],
-    snd: [[0.08, 'jump', 0.55], [0.6, 'jump', 0.5]] },
+  victory: { dur: 2, next: 'victory',
+    fr: [[0, 'dShufL'], [0.22, 'dShufL'], [0.3, 'dHopL', 'out'], [0.42, 'dHopL'], [0.5, 'dShufR'], [0.72, 'dShufR'], [0.8, 'dHopR', 'out'], [0.92, 'dHopR'],
+         [1.0, 'dWaveL'], [1.22, 'dWaveL'], [1.3, 'dHopWaveL', 'out'], [1.42, 'dHopWaveL'], [1.5, 'dWaveR'], [1.72, 'dWaveR'], [1.8, 'dHopWaveR', 'out'], [1.92, 'dHopWaveR'], [2.0, 'dShufL']],
+    snd: [[0.3, 'jump', 0.35], [0.8, 'jump', 0.3], [1.3, 'jump', 0.32], [1.8, 'jump', 0.3]] },
   // ---------- sword ----------
   swKesa: { dur: 0.6, cancel: 0.36, fr: [[0, '*'], [0.15, 'swJodan', 'in'], [0.23, 'swKesa', 'out'], [0.36, 'swKesa'], [0.6, 'base']], imp: [[0.14, 420]], snd: [[0.16, 'swing'], [0.14, 'kiai', 0.8]],
     hits: [{ t: 0.22, reach: 130, dmg: 11, type: 'heavy', h: 'high', limb: 'sw', kx: 520, ky: -200, sword: true }] },
@@ -907,6 +913,7 @@ class Fighter {
     const e = this.foe;
     if (!o.keepFace && e && !this.held) this.face = e.x >= this.x ? 1 : -1;
     this.spinFace = 1;
+    if (name === 'victory') { this.rot = 0; this.vx = 0; this.vy = 0; }
     let r0 = this.rot / this.face; r0 = Math.atan2(Math.sin(r0), Math.cos(r0));
     const lieRot = Math.abs(r0 - PI / 2) < Math.abs(r0 + PI / 2) ? PI / 2 : -PI / 2;
     this.mv = { name, d, t: 0, fired: {}, from: this.pose.slice(), r0, lieRot, o };
@@ -1063,7 +1070,7 @@ class Fighter {
       p[9] = sw(pa) + (sw(pb) - sw(pa)) * u;
       if (M.d.gun) { p[1] = PI / 2 + T.aim; p[2] = PI / 2 + T.aim; if (T.weapon === 'rifle') { p[3] = PI / 2 + T.aim - 0.45; p[4] = PI / 2 + T.aim; } p[9] = p[2]; }
       if (M.d.tremble) { const w = Math.sin(clock * 70 + T.id) * 0.05; p[0] += w; p[1] += w; p[3] -= w; }
-      if (M.name === 'victory') { const w = Math.sin(clock * 10 + T.id); p[1] += w * 0.18; p[3] -= w * 0.14; p[0] += Math.sin(clock * 8) * 0.1; }
+      if (M.name === 'victory') { const b = Math.sin(M.t * Math.PI * 4); p[0] += b * 0.05; p[1] += b * 0.07; p[3] -= b * 0.07; }
       return p;
     }
     const base = basePose(T);
@@ -1110,6 +1117,13 @@ class Fighter {
       if (fB.y > drop - 10 * s) [kB, fB] = ik2(fB.x, drop, Lth, Lsh, f);
     } else { mode = 'air'; drop = (Lth + Lsh) * 0.9; }
     const hip = { x: T.x, y: T.y - drop };
+    // victory dance: visual side-step + beat hop, physics stay planted, body stays upright
+    if (M && M.name === 'victory') {
+      const dur = Math.max(0.01, (d && d.dur) || 2);
+      const ph = (M.t / dur) * TAU;
+      hip.x += Math.sin(ph * 2) * 22 * s;
+      hip.y -= Math.abs(Math.sin(ph * 2)) * 14 * s;
+    }
     const neck = { x: hip.x + Math.sin(p[0]) * f * Lt, y: hip.y - Math.cos(p[0]) * Lt };
     const head = { x: neck.x + Math.sin(p[0]) * f * (hr + 4 * s), y: neck.y - Math.cos(p[0]) * (hr + 4 * s) };
     const sh = { x: lerp(neck.x, hip.x, 0.08), y: lerp(neck.y, hip.y, 0.08) };
@@ -2314,7 +2328,7 @@ function dropOrQueue(p, announce) {
   else if (spot === 'full') refuseQueue(p);
   return null;
 }
-// autobot-v3: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
+// autobot-v4: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
 // Mid-round: knocked-out viewers can comment, like or gift back in after REJOIN_COOLDOWN, at likeHp.
 const AUTO_BOT_FILL = 2;
 const BOT_ADJ = ['Shadow', 'Bolt', 'Fire', 'Storm', 'Neon', 'Frost', 'Turbo', 'Lucky', 'Pixel', 'Blaze', 'Aqua', 'Thunder', 'Nova', 'Rapid', 'Cosmic', 'Iron', 'Wild', 'Solar', 'Night', 'Crimson'];

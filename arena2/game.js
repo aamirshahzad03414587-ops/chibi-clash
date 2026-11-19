@@ -1,6 +1,6 @@
 /* NEON BRAWL - night-city brawl for TikTok LIVE (1080x1920). Same fight engine as Chibi Clash,
    restyled as a distinct game: neon city arena, Rose vs Teal teams, visor fighters, shrinking grid.
-   autobot-v3: always 2 fighters, viewer DP faces, neon winner dance, mid-round rejoin (comment/like/gift). */
+   autobot-v4: upright neon winner dance (robot / floss / dab, no body flip), mid-round rejoin, viewer DP faces. */
 'use strict';
 
 // ============================================================ setup
@@ -674,10 +674,15 @@ const POSES = {
   taunt1:  P(0.05, 1.5, 2.9, 0.4, 2.8, 0.42, 0.18, -0.3, -0.48),       // "come on" beckon
   taunt2:  P(0.05, 1.5, 1.9, 0.4, 2.8, 0.42, 0.18, -0.3, -0.48),
   cheer:   P(0, 2.7, 3.0, 2.5, 2.9, 0.25, 0.05, -0.25, -0.35),
-  danceUp:   P(-0.18, 2.85, 3.2, 2.6, 3.05, 0.62, 0.08, -0.12, -0.55),
-  dabA:      P(0.42, 1.85, 2.35, -0.55, 0.15, 0.7, 0.15, -0.55, -0.85),  // dab lean
-  dabB:      P(0.22, 2.1, 2.6, -0.2, 0.45, 0.4, 0.08, -0.3, -0.5),
-  danceSpin: P(-0.1, 1.6, 2.9, 1.6, 2.9, 0.45, 0.1, -0.45, -0.6),
+  danceUp:   P(-0.06, 2.85, 3.15, 0.2, 0.35, 0.35, 0.06, -0.22, -0.4),
+  dabA:      P(0.2, 1.85, 2.35, -0.35, 0.2, 0.58, 0.1, -0.42, -0.55),    // upright dab (mild lean only)
+  dabB:      P(0.14, 2.05, 2.55, -0.15, 0.4, 0.4, 0.06, -0.32, -0.42),
+  dRoboA:    P(0.08, 3.1, 3.2, 0.08, 0.15, 0.62, 0.12, -0.48, -0.16),   // lead arm straight up, rear hangs
+  dRoboMid:  P(0.0, 1.55, 1.65, 1.55, 1.65, 0.2, 0.0, -0.18, -0.14),    // T-pose bounce
+  dRoboB:    P(-0.08, 0.08, 0.15, 3.1, 3.2, 0.18, 0.0, -0.64, -0.12),   // rear arm straight up, lead hangs
+  dFlossA:   P(0.16, -0.7, 0.15, 1.85, 2.05, 0.68, 0.12, -0.14, -0.42), // arms opposite, hip sway
+  dFlossB:   P(-0.16, 1.85, 2.05, -0.7, 0.15, 0.16, 0.0, -0.68, -0.12),
+  dDab:      P(0.22, 2.05, 2.55, -0.55, 0.1, 0.64, 0.12, -0.5, -0.62),  // one arm across, other back, body upright
   chinA:   P(-0.04, 0.35, 0.6, 1.15, 3.0, 0.3, 0.08, -0.25, -0.35),      // thumb wipes the chin
   chinB:   P(-0.08, 0.35, 0.6, 1.3, 3.45, 0.3, 0.08, -0.25, -0.35),
   neckA:   P(0.02, 2.25, 3.9, 2.05, 3.7, 0.32, 0.1, -0.28, -0.38),       // hands on the head, neck crack
@@ -781,11 +786,11 @@ const MV = {
   iaiReady: { dur: 0.55, fr: [[0, '*'], [0.25, 'swIaiW', 'in'], [0.55, 'swIaiW']], snd: [[0.1, 'iai']] },
   iaiCut: { dur: 0.9, pass: true, fr: [[0, '*'], [0.05, 'swIaiA', 'out'], [0.9, 'swIaiA']], snd: [[0, 'swing'], [0.02, 'kiai']] },
   sheath: { dur: 0.7, fr: [[0, '*'], [0.3, 'swSheath'], [0.55, 'swSheath'], [0.7, 'base']], snd: [[0.5, 'clang', 0.5]] },
-  victory: { dur: 1.25, next: 'victory',
-    fr: [[0, 'cheer'], [0.16, 'danceSpin', 'out'], [0.4, 'dabA', 'out'], [0.62, 'dabB'], [0.88, 'danceSpin'], [1.25, 'cheer']],
-    rot: [[0, 0], [0.18, 0], [0.55, TAU], [0.88, TAU], [1.25, TAU * 2]],
-    imp: [[0.18, 0, -680]],
-    snd: [[0.18, 'jump', 0.5], [0.4, 'kiai', 0.45]] },
+  victory: { dur: 2, next: 'victory',
+    fr: [[0, 'dRoboA'], [0.28, 'dRoboA'], [0.36, 'dRoboMid', 'out'], [0.5, 'dRoboB'], [0.78, 'dRoboB'],
+         [0.88, 'dFlossA', 'out'], [1.08, 'dFlossB'], [1.28, 'dFlossA'], [1.48, 'dFlossB'],
+         [1.62, 'dDab', 'out'], [1.92, 'dDab'], [2.0, 'dRoboA']],
+    snd: [[0.08, 'jump', 0.28], [0.5, 'jump', 0.28], [0.88, 'kiai', 0.35], [1.62, 'kiai', 0.4]] },
   // ---------- sword ----------
   swKesa: { dur: 0.6, cancel: 0.36, fr: [[0, '*'], [0.15, 'swJodan', 'in'], [0.23, 'swKesa', 'out'], [0.36, 'swKesa'], [0.6, 'base']], imp: [[0.14, 420]], snd: [[0.16, 'swing'], [0.14, 'kiai', 0.8]],
     hits: [{ t: 0.22, reach: 130, dmg: 11, type: 'heavy', h: 'high', limb: 'sw', kx: 520, ky: -200, sword: true }] },
@@ -907,6 +912,7 @@ class Fighter {
     const e = this.foe;
     if (!o.keepFace && e && !this.held) this.face = e.x >= this.x ? 1 : -1;
     this.spinFace = 1;
+    if (name === 'victory') { this.rot = 0; this.vx = 0; this.vy = 0; }
     let r0 = this.rot / this.face; r0 = Math.atan2(Math.sin(r0), Math.cos(r0));
     const lieRot = Math.abs(r0 - PI / 2) < Math.abs(r0 + PI / 2) ? PI / 2 : -PI / 2;
     this.mv = { name, d, t: 0, fired: {}, from: this.pose.slice(), r0, lieRot, o };
@@ -1063,7 +1069,7 @@ class Fighter {
       p[9] = sw(pa) + (sw(pb) - sw(pa)) * u;
       if (M.d.gun) { p[1] = PI / 2 + T.aim; p[2] = PI / 2 + T.aim; if (T.weapon === 'rifle') { p[3] = PI / 2 + T.aim - 0.45; p[4] = PI / 2 + T.aim; } p[9] = p[2]; }
       if (M.d.tremble) { const w = Math.sin(clock * 70 + T.id) * 0.05; p[0] += w; p[1] += w; p[3] -= w; }
-      if (M.name === 'victory') { const w = Math.sin(clock * 14 + T.id); p[1] += w * 0.22; p[3] += Math.cos(clock * 12) * 0.2; p[0] += Math.sin(clock * 9) * 0.08; }
+      if (M.name === 'victory') { const b = Math.sin(M.t * Math.PI * 4); p[0] += Math.sin(M.t * Math.PI * 2) * 0.04; p[5] += Math.abs(b) * 0.05; p[7] -= Math.abs(b) * 0.05; }
       return p;
     }
     const base = basePose(T);
@@ -1110,6 +1116,13 @@ class Fighter {
       if (fB.y > drop - 10 * s) [kB, fB] = ik2(fB.x, drop, Lth, Lsh, f);
     } else { mode = 'air'; drop = (Lth + Lsh) * 0.9; }
     const hip = { x: T.x, y: T.y - drop };
+    // victory dance: visual side-step + beat hop, physics stay planted, body stays upright
+    if (M && M.name === 'victory') {
+      const dur = Math.max(0.01, (d && d.dur) || 2);
+      const ph = (M.t / dur) * TAU;
+      hip.x += Math.sin(ph * 2) * 22 * s;
+      hip.y -= Math.abs(Math.sin(ph * 2)) * 14 * s;
+    }
     const neck = { x: hip.x + Math.sin(p[0]) * f * Lt, y: hip.y - Math.cos(p[0]) * Lt };
     const head = { x: neck.x + Math.sin(p[0]) * f * (hr + 4 * s), y: neck.y - Math.cos(p[0]) * (hr + 4 * s) };
     const sh = { x: lerp(neck.x, hip.x, 0.08), y: lerp(neck.y, hip.y, 0.08) };
@@ -2313,7 +2326,7 @@ function dropOrQueue(p, announce) {
   else if (spot === 'full') refuseQueue(p);
   return null;
 }
-// autobot-v3: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
+// autobot-v4: never leave the pit empty. Bots pad to 2 fighters. Reals always take a bot's seat.
 // Mid-round: knocked-out viewers can comment, like or gift back in after REJOIN_COOLDOWN, at likeHp.
 const AUTO_BOT_FILL = 2;
 const BOT_ADJ = ['Volt', 'Glitch', 'Chrome', 'Pulse', 'Circuit', 'Cyber', 'Laser', 'Holo', 'Quark', 'Syntax', 'Zero', 'Hyper', 'Nova', 'Ion', 'Plasma', 'Pixel', 'Binary', 'Aether', 'Drift', 'Hex'];
